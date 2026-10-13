@@ -1,0 +1,16 @@
+{
+  "name": "pix-extension",
+  "version": "2.0.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：两模式条令 + 事实图谱/画板 + 失败回读 + 节奏自适应 + 本机危险命令拦截",
+  "type": "module",
+  "main": "index.ts",
+  "private": true,
+  "dependencies": {
+    "typebox": "^1.3.27"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.1.0",
+    "@types/node": "^26.6.5",
+    "typescript": "5.6"
+  }
+}

@@ -1,0 +1,28 @@
+node_modules/
+.zcodeignore
+acceptance/scratch/
+acceptance/stub-captures.jsonl
+archive/
+*.log
+vpn/
+dist/
+docs/PiX-50问澄清.md
+docs/PiX-最终方案.md
+docs/PiX-一键部署方案.md
+docs/授权测试记录.md
+docs/api-verified.md
+__pycache__/
+*.pyc
+
+# 工具树（1.5GB+，随目录分发不进 git）
+tools/
+
+# 内部设计文档（敏感/非交付）
+docs/PiX-改良方案-工具内置版.md
+docs/PiX-画板v3方案-excalidraw内核.md
+docs/PiX-画板v4设计方案.md
+docs/PiX-画板可视化与归档滚动方案.md
+# 验收/运行产物
+pix-state.json
+pix-state.tmp
+pix-snapshots/
