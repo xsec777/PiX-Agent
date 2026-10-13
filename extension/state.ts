@@ -246,15 +246,6 @@ export function elapsedMinutes(): number {
 	return Math.round((Date.now() - getState().sessionStartedAt) / 60000);
 }
 
-/**
- * 收口冲刺是否激活（规则注入与节奏提速共用同一条件，防口径漂移）。
- * 判定 = 已进行分钟数 >= 时限 - 5；时限默认 30min（与 bench-run --timeout-min 默认一致），
- * PIX_TIME_BUDGET_MIN 可覆盖。仅评测类长会话由调用方（rules/pacing）决定是否启用本判定。
- */
-export function isTimeRushActive(budgetMin = Number(process.env.PIX_TIME_BUDGET_MIN ?? "30")): boolean {
-	return elapsedMinutes() >= budgetMin - 5;
-}
-
 type SessionEntry = { type?: string; customType?: string; data?: unknown };
 
 /**

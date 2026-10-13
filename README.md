@@ -130,7 +130,6 @@ toolbox({action:"howto", tool:"sqlmap"})          # 完整工具卡：唯一姿�
 | `/pix` / `/pix export` | 状态总览 / 画板双图落盘 |
 | `/report` | 渗透报告落盘（攻击链配图 + 状态机参与线） |
 | `/toolbox export` | 全量工具卡手册导出（单文件 MD） |
-| `/tsecbench <BASE_URL> <TOKEN>` | 配置腾讯 TSecBench 评测接入（`/tsecbench status` 查状态） |
 
 | 工具 | 用途 |
 |---|---|
@@ -140,19 +139,6 @@ toolbox({action:"howto", tool:"sqlmap"})          # 完整工具卡：唯一姿�
 | `get_state` / `get_task` | 读画板全量 / 任务书全文 |
 | `export_map` | Mermaid 关系图（会话内返回） |
 | `toolbox` | 工具注册表网关（list/howto/search） |
-| `tsecbench_challenges/start/hint/submit/close` | 腾讯 TSecBench 评测靶场五件套（列题/启动/提示/交 flag/释放；`start` 返回的 container_addr 即唯一授权范围，禁打平台域名） |
-
-### 评测跑批
-
-```bash
-node scripts/bench-run.mjs                    # 全量跑未完成题（每题独立会话，单题 30 分钟帽）
-node scripts/bench-run.mjs --codes e1-04,e1-05 --timeout-min 30
-node scripts/bench-score.mjs                 # 分系列成绩单（●=已拿下）
-```
-
-- 凭据读 `~/.pix/tsecbench.json`（`/tsecbench` 命令配置）；进度落 `acceptance/scratch/bench/progress.json`
-- 每题一个干净会话：/auth 登记授权 → 题面下发 → Agent 自主 start/测试/submit/close → API 复核计分
-- 超时自动释放容器保证可重跑（已提交的分数已入账）；多 flag 题不会提前释放
 
 ## 技能接入
 
@@ -180,7 +166,7 @@ scripts/pix-web.cmd               # 启动 pi-web + 服务商缓存同步（增�
 cd acceptance && npm install && node run-acceptance.mjs
 ```
 
-32 项断言覆盖（含 v1.1 新增：历史画板读回 / 评测无人值守条款 / 收口冲刺）：模式注入（pent/redt/授权段/任务书围栏）、失败 6 次回读、元认知反思、节奏墙钟探针（连败 2s/连胜 0.5s/基准 2s）、护栏拦截、会话重载读回、toolbox 三入口、update_node 联动、画板/报告落盘、TSecBench 五件套。全程绿色即通过。
+29 项断言覆盖：模式注入（pent/redt/授权段/任务书围栏）、失败 6 次回读、元认知反思、节奏墙钟探针（连败 2s/连胜 0.5s/基准 2s）、护栏拦截、会话重载读回、toolbox 三入口、update_node 联动、画板/报告落盘、历史画板继承。全程绿色即通过。
 
 ## 合规声明
 

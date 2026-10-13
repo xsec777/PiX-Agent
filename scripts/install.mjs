@@ -27,7 +27,7 @@ import { execSync, spawnSync } from "node:child_process";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXT_SRC = join(ROOT, "extension");
 const EXT_DST = join(homedir(), ".pi", "agent", "extensions", "pix");
-const FILES = ["index.ts", "state.ts", "rules.ts", "pacing.ts", "guard.ts", "gate.ts", "sensor.ts", "mirror.ts", "toolbox.ts", "toolbox-data.ts", "tsecbench.ts", "report.ts", "package.json", "package-lock.json"];
+const FILES = ["index.ts", "state.ts", "rules.ts", "pacing.ts", "guard.ts", "gate.ts", "sensor.ts", "mirror.ts", "toolbox.ts", "toolbox-data.ts", "report.ts", "package.json", "package-lock.json"];
 
 /** 路径配置链（改良8）：install 时把实际仓库 tools 根写入 pix-config.json，跨机分发零手工 */
 function writePixConfig() {

@@ -12,7 +12,6 @@ Pi 扩展（部署到 `~/.pi/agent/extensions/pix/`，jiti 免编译加载）。
 - `mirror.ts` — 落库调用 → 画板镜像（提案即镜像，不依赖 MCP 连通）
 - `toolbox-data.ts` — 工具注册表内嵌数据（31 实测 + 7 扩展位：隧道/代理 5、提权枚举 3，转子女神已剔除）
 - `toolbox.ts` — toolbox 网关（list / howto / search 三入口 + 可用性探测；howto 记账供读卡门禁 gate.ts 判定）
-- `tsecbench.ts` — 腾讯 TSecBench 评测接入（challenges/start/hint/submit/close 五工具 + /tsecbench 配置命令）
 - `report.ts` — /report 报告管线（快照→渲染→落盘）
 
 安装/更新：仓库根目录 `node scripts/install.mjs`。项目总览见[仓库 README](../README.md)。

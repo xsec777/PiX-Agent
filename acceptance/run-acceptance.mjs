@@ -11,7 +11,7 @@
  *   toolbox 四步：list / howto / search / 工具纪律段注入
  *   update_node 两步：confirmed 联动 / /pix export 双图落盘
  *   /report 一步：报告落盘
- *   tsecbench 三步：两态 / 欢迎引导 / 画板快照
+ *   画板快照
  *   C1-C3 扩展：读卡门禁拦/放 / 传感器止损提醒 / 记账提醒（客观信号机制）
  *
  * 用法：node run-acceptance.mjs
@@ -302,7 +302,7 @@ async function main() {
 		);
 
 		// 新增A：/auth 登记后授权段注入
-		await pi.send({ type: "prompt", message: "/auth hbc2.example.com,10.0.0.0/24 --source 自建靶场" });
+		await pi.send({ type: "prompt", message: "/auth hbc2.haobachang.com,10.0.0.0/24 --source 自建靶场" });
 		const authNotify = pi.notifyTexts().find((n) => String(n.message).includes("已登记授权范围"));
 		await pi.promptAndWait("auth check");
 		const capA = lastCapture();
@@ -310,7 +310,7 @@ async function main() {
 		const stepAuthOk =
 			Boolean(authNotify) &&
 			secA.includes("【当前授权范围】") &&
-			secA.includes("hbc2.example.com") &&
+			secA.includes("hbc2.haobachang.com") &&
 			secA.includes("自建靶场");
 		report(
 			"新增A /auth 登记后 section 注入授权范围段",
@@ -322,7 +322,7 @@ async function main() {
 		const taskPath = join(SCRATCH, "task-brief.md");
 		writeFileSync(
 			taskPath,
-			"# 2026 红蓝对抗演练任务书\n\n## 授权范围\nhbc2.example.com 内网段 10.0.0.0/24\n\n## 授权时间窗\n2026-10-10 至 2026-10-17\n\n## 目标\n获取域控权限并取证\n\n## 禁区\n财务系统 10.0.9.0/24 禁触碰\n",
+			"# 2026 红蓝对抗演练任务书\n\n## 授权范围\nhbc2.haobachang.com 内网段 10.0.0.0/24\n\n## 授权时间窗\n2026-10-10 至 2026-10-17\n\n## 目标\n获取域控权限并取证\n\n## 禁区\n财务系统 10.0.9.0/24 禁触碰\n",
 			"utf8",
 		);
 		await pi.send({ type: "prompt", message: `/task ${taskPath}` });
@@ -571,23 +571,6 @@ async function main() {
 			`通知: ${JSON.stringify(reportNotify?.message?.slice(0, 80))} · 文件: ${reportFiles.join(",") || "无"} · 结构校验: ${reportOk}`,
 		);
 
-		// ---------- M5 前置：tsecbench 未配置引导 / 已配置真调 API（两态） ----------
-		await pi.promptAndWait("tsecbench check");
-		const tsb = pi.toolEnds("tsecbench_challenges");
-		const tsbText = tsb.map(toolText).join("\n");
-		// 两态：①未配置 → 引导文案；②已配置（本机 ~/.pix/tsecbench.json 有真实凭据）→ 真调 API
-		//   （返回平台 JSON 或 HTTP 错误码都算"真调"，证明链路接通）
-		const m5_0 =
-			(tsbText.includes("TSecBench 未配置") && tsbText.includes("/tsecbench")) ||
-			tsbText.includes("TSecBench challenges 失败") ||
-			tsbText.includes('"code"') ||
-			/题目|challenges|unique/i.test(tsbText);
-		report(
-			"M5.0 tsecbench 未配置引导 / 已配置真调（两态断言）",
-			m5_0,
-			`返回: ${tsbText.slice(0, 160)}`,
-		);
-
 		const welcomeSeen = pi.notifyTexts().some((n) => String(n.message).includes("上手三步"));
 		report(
 			"M5.1 新会话欢迎引导通知（一次性）",
@@ -638,11 +621,9 @@ async function main() {
 			`section 止损=${secS.includes("【止损提醒】")} 记账=${secS.includes("【记账提醒】")}\nget_state 含观察器方向=${sensorState.includes("连续拦截/报错（观察器）")}`,
 		);
 
-		// ---------- v1.1 新增（改良2/4/5）：历史画板读回 + 评测无人值守条款 + 收口冲刺 ----------
-		// 第二个全新会话（同 cwd、无 pix-state entries）→ cwd/pix-state.json 读回注入【历史画板】；
-		// PIX_TIME_BUDGET_MIN=1 → 收口冲刺阈值在会话 0 分钟即满足（验证注入存在性，真实行为由 elapsedMinutes 保证）
+		// ---------- v1.1 新增：历史画板读回（跨会话知识继承） ----------
+		// 第二个全新会话（同 cwd、无 pix-state entries）→ cwd/pix-state.json 读回注入【历史画板】
 		pi.dispose(); // 先释放第一个进程（RPC 单实例；其画板已持久化到 cwd/pix-state.json）
-		process.env.PIX_TIME_BUDGET_MIN = "1";
 		const pi2 = new RpcPi();
 		try {
 			await pi2.send({ type: "set_model", provider: "stub", modelId: "stub-model" });
@@ -651,19 +632,14 @@ async function main() {
 			const secH = capH?.sections?.pix ?? "";
 			const v11ok =
 				secH.includes("【历史画板 · 上次会话进展】") &&
-				secH.includes("继承自 cwd/pix-state.json") &&
-				secH.includes("评测无人值守条款") &&
-				secH.includes("恢复剧本") &&
-				secH.includes("【收口冲刺】") &&
-				secH.includes("tsecbench_submit");
+				secH.includes("继承自 cwd/pix-state.json");
 			report(
-				"v1.1 历史画板读回 + 评测无人值守条款 + 收口冲刺（改良4/2/5）",
+				"v1.1 历史画板读回（跨会话知识继承）",
 				v11ok,
-				`历史画板=${secH.includes("【历史画板")} 继承声明=${secH.includes("继承自 cwd/pix-state.json")} 无人值守=${secH.includes("评测无人值守条款")} 收口冲刺=${secH.includes("【收口冲刺】")}`,
+				`历史画板=${secH.includes("【历史画板")} 继承声明=${secH.includes("继承自 cwd/pix-state.json")}`,
 			);
 		} finally {
 			pi2.dispose();
-			delete process.env.PIX_TIME_BUDGET_MIN;
 		}
 	} finally {
 		pi.dispose();

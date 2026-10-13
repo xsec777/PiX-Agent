@@ -10,8 +10,7 @@
  * 扩展自身的状态簿记工具不占节奏）。
  */
 
-import { getState, ADAPTIVE_WINDOW, isTimeRushActive } from "./state.ts";
-import { isTsecbenchConfigured } from "./tsecbench.ts";
+import { getState, ADAPTIVE_WINDOW } from "./state.ts";
 
 function pacingCoefficient(recentResults: boolean[]): number {
 	if (recentResults.length === 0) return 1;
@@ -20,12 +19,9 @@ function pacingCoefficient(recentResults: boolean[]): number {
 	return Math.min(2, Math.max(0.5, coefficient));
 }
 
-/** 当前应等待的毫秒数（考虑 adaptive 开关；评测收口冲刺阶段强制下限提速，仅评测场景生效，与规则注入共用同一条件） */
+/** 当前应等待的毫秒数（考虑 adaptive 开关） */
 export function currentDelayMs(): number {
 	const state = getState();
-	if (isTsecbenchConfigured() && isTimeRushActive()) {
-		return Math.round(state.baseIntervalMs * 0.5);
-	}
 	const coefficient = state.adaptive ? pacingCoefficient(state.recentResults) : 1;
 	return Math.round(state.baseIntervalMs * coefficient);
 }

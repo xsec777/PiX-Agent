@@ -88,9 +88,6 @@ const SCRIPT: ScriptStep[] = [
 	// ---- M3：画板状态流转 ----
 	{ toolCalls: [{ name: "update_node", arguments: { id: "H1", status: "confirmed", note: "union select 回显验证成功" } }] },
 	{ text: "h1 confirmed" },
-	// ---- M5 前置：tsecbench 未配置引导 ----
-	{ toolCalls: [{ name: "tsecbench_challenges", arguments: {} }] },
-	{ text: "tsecbench guide shown" },
 	{ toolCalls: [{ name: "get_state", arguments: {} }] },
 	{ text: "config3 reported" }, // 附加B：switch_session 前读取期望节点/边数
 	// ---- C3：传感器（连续拦截/报错 → 止损提醒 + 客观失败入账；外部动作未入账 → 记账提醒） ----

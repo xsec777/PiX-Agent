@@ -16,7 +16,6 @@
  *   mirror.ts 落库调用 → 画板镜像（提案即镜像，不依赖 MCP 连通）
  *   toolbox.ts / toolbox-data.ts 工具箱网关（list/howto/search + 39 卡注册表）
  *   report.ts /report 报告管线
- *   tsecbench.ts TSecBench 评测接入（条件注册）
  *   index.ts  本文件：事件钩子 + 命令 + 工具注册
  *
  * API 签名依据：@earendil-works/pi-coding-agent@1.1.0 dist/core/extensions/types.d.ts
@@ -55,7 +54,6 @@ import { checkCardGate, ensureTimeout } from "./gate.ts";
 import { countExternalAction, noteLedger, noteResult } from "./sensor.ts";
 import { mirrorPentrackCall } from "./mirror.ts";
 import { registerToolboxTool } from "./toolbox.ts";
-import { registerTsecbench, isTsecbenchConfigured } from "./tsecbench.ts";
 import { loadRegistry } from "./toolbox.ts";
 
 /** Mermaid 导出：graph 视图（关系图；leads_to 加粗为攻击链主线） */
@@ -181,7 +179,7 @@ export default function (pi: ExtensionAPI) {
 		);
 		if (!restored && state.nodes.length === 0 && !state.auth && !state.task && !historyNote) {
 			ctx.ui.notify(
-				"上手三步：①设置→模型 填 API Key（未配）②/ 查看命令（/auth 登记授权、/pix 总览）③直接对话开工。\n工具箱：toolbox({action:'list'}) 查 38 张工具卡（31 实测+7 扩展位）；/report 出报告；/pix export 导出画板。",
+				"上手三步：①设置→模型 填 API Key（未配）②/ 查看命令（/auth 登记授权、/pix 总览）③直接对话开工。\n工具箱：toolbox({action:'list'}) 查 39 张工具卡（31 实测+8 扩展位）；/report 出报告；/pix export 导出画板。",
 				"info",
 			);
 		}
@@ -755,8 +753,4 @@ export default function (pi: ExtensionAPI) {
 	// --- 工具 8：toolbox（工具注册表网关，M2） ---
 	registerToolboxTool(pi);
 
-	// --- 工具组 9：tsecbench_*（条件注册：未配置不挂 5 个评测工具——问题清单 #3，省上下文与选择噪声） ---
-	if (isTsecbenchConfigured()) {
-		registerTsecbench(pi);
-	}
 }
