@@ -47,19 +47,21 @@
 
 ---
 
-## 🚀 快速开始
+## 🚀 快速开始（一键）
 
 ```bash
-# 1. 安装 pi 运行时（全局）
-npm install -g @earendil-works/pi-coding-agent @agegr/pi-web
+# 双击或运行一键启动脚本（自动检查 Node/pi/pi-web → 缺失则安装 → 部署扩展 → 启动 Web UI）
+scripts\pix-start.cmd
+```
 
-# 2. 进入 PiX 目录，部署扩展（自动写 pix-config.json 定位工具根）
-cd PiX
-node scripts/install.mjs
+启动后浏览器访问 **http://127.0.0.1:30141**；看到通知「PiX 已加载 · 模式=pent」即成功，全新会话再收到「上手三步」引导。
 
-# 3. 启动（二选一）
-scripts\pix-web.cmd        # Web UI（推荐）：启动后访问 http://127.0.0.1:30141
-pi                         # 终端 TUI
+手动分步（等价于脚本内部动作）：
+
+```bash
+npm install -g @earendil-works/pi-coding-agent @agegr/pi-web   # 安装 pi 运行时
+node scripts/install.mjs                                      # 部署扩展
+scripts\pix-web.cmd                                          # Web UI 启动器（或 `pi` 进终端 TUI）
 ```
 
 启动后应看到通知 **「PiX 已加载 · 模式=pent · 节奏=自适应 2s」**；全新会话再收到「上手三步」引导。
