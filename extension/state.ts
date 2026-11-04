@@ -14,9 +14,7 @@ import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 const STATE_TYPE = "pix-state";
-/** 历史画板编辑条目（v3 画板时代由 ：30146 服务写入；UI 已下线，本类型仅存读回兼容） */
-const BOARD_EDIT_TYPE = "pix-board-edit";
-/** 旧版（M1 pentest 扩展）的 customType，仅用于读回迁移 */
+/** 旧版（pentest-state）的 customType，仅用于旧会话读回迁移 */
 const LEGACY_STATE_TYPE = "pentest-state";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +40,14 @@ export interface Node {
 	status?: NodeStatus;
 	/** 置信度（high/medium/low；record_fact 与 pentrack 镜像可带） */
 	confidence?: string;
+	/** 原始可复现 HTTP 请求包（Raw HTTP Request） */
+	evidenceRequest?: string;
+	/** 关键响应差分切片（Raw HTTP Response Snippet） */
+	evidenceResponse?: string;
+	/** 数据泄露/受影响总量计数（如 COUNT(*) 统计值） */
+	affectedCount?: number;
+	/** 脱敏最小数据样本证明（3~5 行真实样本） */
+	sampleProof?: string;
 	createdAt: string;
 }
 
@@ -52,52 +58,77 @@ export interface Edge {
 }
 
 // ---------------------------------------------------------------------------
-// 画板用户叠加层（v3）：画布编辑同步回 Agent
-// 语义图（nodes/edges）归 agent；用户在画布上的视觉层改动（便签/画笔/节点偏移/
-// 用户连线）落 boardOverlay，状态切换直接写 node.status。报告不含视觉层。
+// 四维超图模型 (4D Hypergraph: Host / PivotSession / Credential / Fact)
+// 覆盖：外网攻击面测绘 -> 边界打点破门 -> 跳板建立 -> 内网横向与域攻坚
 // ---------------------------------------------------------------------------
 
-interface BoardNote {
+export type NetworkScope = "external" | "dmz" | "internal";
+
+export interface HostService {
+	port: number;
+	protocol: string;
+	banner?: string;
+	vulns?: string[];
+}
+
+export interface HostNode {
 	id: string;
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	text: string;
+	ips: string[];
+	hostname?: string;
+	os?: string;
+	domain?: string;
+	/** 网络区域：external=外网暴露资产 / dmz=边界双网卡跳板 / internal=内网核心资产 */
+	networkScope?: NetworkScope;
+	isDC?: boolean;
+	/** 是否已攻破拿到初始立足点/执行权限 (PWNED) */
+	isCompromised?: boolean;
+	/** 边界突破/攻陷途径：如 "Shiro反序列化", "文件上传WebShell", "Tongda OA RCE", "SQL注入获取密码" */
+	compromiseVector?: string;
+	services: HostService[];
+	discoveredAt: string;
 }
 
-interface BoardStroke {
+export interface PivotSessionNode {
 	id: string;
-	points: number[][];
-	color?: string;
+	sourceHostId: string;
+	tunnelType: "socks5" | "ssh_tun" | "cmd_pipe" | "webshell" | "frp";
+	localListenPort: number;
+	egressSubnets: string[];
+	status: "active" | "dead";
+	createdAt: string;
 }
 
-interface BoardOverlay {
-	notes: BoardNote[];
-	strokes: BoardStroke[];
-	/** 节点拖拽偏移（自动布局基准位 + 偏移 = 用户摆放位置） */
-	offsets: Record<string, { dx: number; dy: number }>;
-	/** 用户手绘连线（from/to 为节点 id；语义关系归 agent，用户连线仅展示+提示） */
-	userEdges: { from: string; to: string }[];
+export interface CredentialNode {
+	id: string;
+	account: string;
+	domain?: string;
+	type: "plaintext" | "ntlm_hash" | "kerberos_ticket" | "ssh_key" | "api_key";
+	value: string;
+	originHostId: string;
+	privilegeScope: "local_admin" | "domain_admin" | "domain_user" | "guest";
+	validTargets: string[];
+	createdAt: string;
 }
 
-function emptyOverlay(): BoardOverlay {
-	return { notes: [], strokes: [], offsets: {}, userEdges: [] };
+// ---------------------------------------------------------------------------
+// 端点接口资产台账模型 (Endpoint Ledger: Web/API 资产闭环与状态机)
+// 状态流转：discovered(发现) -> probing(探针测试) -> bypassing(变异绕过) -> confirmed(坐实)/rejected(排除)
+// ---------------------------------------------------------------------------
+
+export type EndpointStatus = "discovered" | "probing" | "bypassing" | "confirmed" | "rejected";
+
+export interface EndpointNode {
+	id: string;
+	url: string;
+	method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
+	params?: string[];
+	authRequired?: boolean;
+	status: EndpointStatus;
+	vulnerabilities?: string[];
+	discoveredFrom?: string;
+	testedTimes: number;
+	lastTestedAt?: string;
 }
-
-
-type BoardEditOp =
-	| { op: "note.add"; id: string; x: number; y: number; w: number; h: number; text: string }
-	| { op: "note.edit"; id: string; text: string }
-	| { op: "note.move"; id: string; x: number; y: number }
-	| { op: "note.del"; id: string }
-	| { op: "stroke.add"; id: string; points: number[][]; color?: string }
-	| { op: "stroke.del"; id: string }
-	| { op: "node.move"; target: string; dx: number; dy: number }
-	| { op: "node.status"; target: string; status: NodeStatus }
-	| { op: "edge.user"; from: string; to: string }
-	| { op: "edge.user.del"; from: string; to: string }
-	| { op: "overlay.sync"; overlay: BoardOverlay };
 
 /** 授权范围登记（/auth 写入） */
 interface AuthScope {
@@ -131,14 +162,14 @@ interface PixState {
 	/** 会话开始时间（get_state elapsedMin / 收口冲刺依据） */
 	sessionStartedAt: number;
 	/** 授权范围（可选，/auth 登记） */
-	auth?: AuthScope;
-	/** 红队任务书（可选，/task 登记） */
-	task?: TaskBrief;
-	/** 画板用户叠加层（可选；v3 画布编辑同步） */
-	boardOverlay?: BoardOverlay;
-	/** pix-board-edit 消费水位线（条目 ts；幂等，跨 compaction 由 persist 保住） */
-	boardEditWatermark?: number;
-}
+		auth?: AuthScope;
+		/** 红队任务书（可选，/task 登记） */
+		task?: TaskBrief;
+		hosts: HostNode[];
+		sessions: PivotSessionNode[];
+		credentials: CredentialNode[];
+		endpoints: EndpointNode[];
+	}
 
 // ---------------------------------------------------------------------------
 // 常量（对外导出，供 rules/index 共用；阈值按最终方案定死）
@@ -167,7 +198,11 @@ function freshState(): PixState {
 		edges: [],
 		failureCounts: {},
 		sessionStartedAt: Date.now(),
-	};
+			hosts: [],
+			sessions: [],
+			credentials: [],
+			endpoints: [],
+		};
 }
 
 export function getState(): PixState {
@@ -209,10 +244,15 @@ interface CwdSnapshot {
 }
 
 function writeStateSnapshot(): void {
-	const file = join(process.cwd(), "pix-state.json");
-	const tmp = join(process.cwd(), "pix-state.tmp");
-	writeFileSync(tmp, JSON.stringify({ savedAt: new Date().toISOString(), state }), "utf8");
-	renameSync(tmp, file);
+	try {
+		const cwd = process.cwd();
+		const file = join(cwd, "pix-state.json");
+		const tmp = join(cwd, `pix-state.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`);
+		writeFileSync(tmp, JSON.stringify({ savedAt: new Date().toISOString(), state }, null, 2), "utf8");
+		renameSync(tmp, file);
+	} catch {
+		// cwd 存档容错
+	}
 }
 
 export function readStateSnapshot(): CwdSnapshot | null {
@@ -302,12 +342,14 @@ function asState(data: unknown): PixState | undefined {
 		edges: Array.isArray(d.edges) ? d.edges : [],
 		failureCounts: d.failureCounts && typeof d.failureCounts === "object" ? d.failureCounts : {},
 		sessionStartedAt: Date.now(), // 恢复后由 session_start 钩子重设计时
-	};
-	if (d.auth && Array.isArray(d.auth.targets)) restored.auth = d.auth;
-	if (d.task && typeof d.task.content === "string") restored.task = d.task;
-	if (d.boardOverlay && Array.isArray(d.boardOverlay.notes)) restored.boardOverlay = d.boardOverlay;
-	if (typeof d.boardEditWatermark === "number" && d.boardEditWatermark > 0) restored.boardEditWatermark = d.boardEditWatermark;
-	return restored;
+			hosts: Array.isArray(d.hosts) ? d.hosts : [],
+			sessions: Array.isArray(d.sessions) ? d.sessions : [],
+			credentials: Array.isArray(d.credentials) ? d.credentials : [],
+			endpoints: Array.isArray(d.endpoints) ? d.endpoints : [],
+		};
+		if (d.auth && Array.isArray(d.auth.targets)) restored.auth = d.auth;
+		if (d.task && typeof d.task.content === "string") restored.task = d.task;
+		return restored;
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +425,20 @@ export function updateNodeStatus(
 	const parts = [
 		`能力 ${byType.capability} · 发现 ${byType.finding} · 假设 ${byType.hypothesis} · 失败 ${byType.failure} · 关系 ${state.edges.length} 条`,
 	];
+		if (state.hosts && state.hosts.length > 0) {
+			const ext = state.hosts.filter((h) => h.networkScope === "external").length;
+			const dmz = state.hosts.filter((h) => h.networkScope === "dmz").length;
+			const intra = state.hosts.filter((h) => h.networkScope === "internal").length;
+			const pwned = state.hosts.filter((h) => h.isCompromised).length;
+			parts.push(`【4D超图】攻防资产 ${state.hosts.length} 台 (外网 ${ext} / DMZ ${dmz} / 内网 ${intra} · 攻破 ${pwned})`);
+		}
+	if (state.sessions && state.sessions.length > 0) {
+		const active = state.sessions.filter((s) => s.status === "active").length;
+		parts.push(`【4D超图】活动跳板/隧道 ${active} 条`);
+	}
+	if (state.credentials && state.credentials.length > 0) {
+		parts.push(`【4D超图】凭据金库 ${state.credentials.length} 项`);
+	}
 	const openHypotheses = state.nodes
 		.filter((n) => n.type === "hypothesis" && (!n.status || n.status === "open"))
 		.slice(0, 3);
@@ -399,12 +455,6 @@ export function updateNodeStatus(
 // ---------------------------------------------------------------------------
 
 /** 最近一批未提示给 agent 的画板编辑摘要行（rules.ts buildSection 读） */
-let lastEditLines: string[] = [];
-
-export function boardEditLines(): string[] {
-	return lastEditLines;
-}
-
 /** 历史画板摘要行（session_start 读回 cwd 存档后注入 section；rules.ts buildSection 读） */
 let historyLines: string[] = [];
 
@@ -416,114 +466,300 @@ export function historyLinesOf(): string[] {
 	return historyLines;
 }
 
-/** 会话切换时重置 section 注入行——防历史画板摘要/画板编辑提示泄漏到下一会话（index.ts session_start 调用） */
+/** 会话切换时重置 section 注入行（防历史画板摘要泄漏到下一会话） */
 export function resetSectionLines(): void {
 	historyLines = [];
-	lastEditLines = [];
 }
 
-function applyBoardEdit(edit: BoardEditOp, summary: string[]): void {
-	if (!state.boardOverlay) state.boardOverlay = emptyOverlay();
-	const ov = state.boardOverlay;
-	switch (edit.op) {
-		case "note.add":
-			if (!ov.notes.some((n) => n.id === edit.id)) {
-				ov.notes.push({ id: edit.id, x: edit.x, y: edit.y, w: edit.w, h: edit.h, text: edit.text });
-				if (edit.text.trim()) summary.push(`便签：「${edit.text.slice(0, 120)}」`);
-			}
-			return;
-		case "note.edit": {
-			const n = ov.notes.find((x) => x.id === edit.id);
-			if (n && n.text !== edit.text) {
-				n.text = edit.text;
-				summary.push(`便签改为：「${edit.text.slice(0, 120)}」`);
-			}
-			return;
-		}
-		case "note.move": {
-			const n = ov.notes.find((x) => x.id === edit.id);
-			if (n) {
-				n.x = edit.x;
-				n.y = edit.y;
-			}
-			return;
-		}
-		case "note.del":
-			ov.notes = ov.notes.filter((x) => x.id !== edit.id);
-			return;
-		case "stroke.add":
-			if (!ov.strokes.some((s) => s.id === edit.id) && Array.isArray(edit.points)) {
-				ov.strokes.push({ id: edit.id, points: edit.points, color: edit.color });
-			}
-			return;
-		case "stroke.del":
-			ov.strokes = ov.strokes.filter((x) => x.id !== edit.id);
-			return;
-		case "node.move":
-			ov.offsets[edit.target] = { dx: edit.dx, dy: edit.dy };
-			return;
-		case "node.status": {
-			const node = state.nodes.find((n) => n.id === edit.target);
-			if (node && node.status !== edit.status) {
-				node.status = edit.status;
-				node.detail = `${node.detail ? node.detail + "\n" : ""}[user] 画板标记为 ${edit.status}`;
-				summary.push(`${node.id}（${node.label.slice(0, 40)}）→ ${edit.status === "confirmed" ? "✓ 确认" : edit.status === "rejected" ? "✗ 否证" : edit.status}（用户在画板标记）`);
-			}
-			return;
-		}
-		case "edge.user":
-			if (edit.from !== edit.to && !ov.userEdges.some((e) => e.from === edit.from && e.to === edit.to)) {
-				ov.userEdges.push({ from: edit.from, to: edit.to });
-				summary.push(`用户连线：${edit.from} → ${edit.to}`);
-			}
-			return;
-		case "edge.user.del":
-			ov.userEdges = ov.userEdges.filter((e) => !(e.from === edit.from && e.to === edit.to));
-			return;
-		case "overlay.sync":
-			// undo/批量同步：整体替换（便签文字仍要提示）
-			for (const n of edit.overlay.notes ?? []) {
-				if (n.text?.trim()) summary.push(`便签：「${String(n.text).slice(0, 120)}」`);
-			}
-			state.boardOverlay = edit.overlay;
-			return;
-	}
+// ---------------------------------------------------------------------------
+// 4D 超图业务操作函数
+// ---------------------------------------------------------------------------
+
+export function getAllHosts(): HostNode[] {
+	return state.hosts;
 }
 
-/**
- * 消费磁盘会话文件里 ts > 水位线的 pix-board-edit 条目（幂等：水位线持久化在 state）。
- * @returns 应用到内存的编辑条数；summary 行写入 boardEditLines() 供 section 注入。
- */
-export function mergeBoardEdits(pi: ExtensionAPI, sessionFile: string): number {
-	let raw: string;
-	try {
-		raw = readFileSync(sessionFile, "utf8");
-	} catch {
-		return 0;
-	}
-	const watermark = state.boardEditWatermark ?? 0;
-	const summary: string[] = [];
-	let maxTs = watermark;
-	let applied = 0;
-	for (const line of raw.split("\n")) {
-		if (!line.includes(BOARD_EDIT_TYPE)) continue;
-		let entry: { type?: string; customType?: string; data?: { ts?: number; edits?: BoardEditOp[] } };
-		try {
-			entry = JSON.parse(line);
-		} catch {
-			continue;
+export function getAllSessions(): PivotSessionNode[] {
+	return state.sessions;
+}
+
+export function getAllCredentials(): CredentialNode[] {
+	return state.credentials;
+}
+
+export function recordHost(host: {
+	id?: string;
+	ips: string[];
+	hostname?: string;
+	os?: string;
+	domain?: string;
+	networkScope?: NetworkScope;
+	isDC?: boolean;
+	isCompromised?: boolean;
+	compromiseVector?: string;
+	services?: HostService[];
+}): HostNode {
+	const ip = host.ips[0] || "unknown";
+	const id = host.id || `host_${ip.replace(/[^a-zA-Z0-9]/g, "_")}`;
+	const existing = state.hosts.find((h) => h.id === id);
+	const node: HostNode = {
+		id,
+		ips: host.ips,
+		hostname: host.hostname,
+		os: host.os,
+		domain: host.domain,
+		networkScope: host.networkScope || "external",
+		isDC: host.isDC ?? false,
+		isCompromised: host.isCompromised ?? false,
+		compromiseVector: host.compromiseVector,
+		services: host.services || [],
+		discoveredAt: existing ? existing.discoveredAt : new Date().toISOString(),
+	};
+	if (existing) {
+		if (host.services && host.services.length > 0) {
+			const svcMap = new Map<number, HostService>();
+			for (const s of existing.services) svcMap.set(s.port, s);
+			for (const s of host.services) svcMap.set(s.port, { ...svcMap.get(s.port), ...s });
+			node.services = Array.from(svcMap.values()).sort((a, b) => a.port - b.port);
+		} else {
+			node.services = existing.services;
 		}
-		if (entry?.type !== "custom" || entry.customType !== BOARD_EDIT_TYPE || !Array.isArray(entry.data?.edits)) continue;
-		const ts = typeof entry.data!.ts === "number" ? entry.data!.ts : 0;
-		if (ts <= watermark) continue;
-		maxTs = Math.max(maxTs, ts);
-		for (const edit of entry.data!.edits) applyBoardEdit(edit, summary);
-		applied += entry.data!.edits.length;
+		node.isCompromised = existing.isCompromised || node.isCompromised;
+		node.isDC = existing.isDC || node.isDC;
+		node.os = host.os || existing.os;
+		node.hostname = host.hostname || existing.hostname;
+		node.domain = host.domain || existing.domain;
+		node.networkScope = host.networkScope || existing.networkScope || "external";
+		node.compromiseVector = host.compromiseVector || existing.compromiseVector;
+		Object.assign(existing, node);
+	} else {
+		state.hosts.push(node);
 	}
-	if (maxTs > watermark) {
-		state.boardEditWatermark = maxTs;
-		persist(pi);
+	// 自动生成画板展示节点
+	const existingGraphNode = state.nodes.find((n) => n.id === id);
+	const scopeTag = node.networkScope === "external" ? "[外网边界]" : node.networkScope === "dmz" ? "[DMZ双网卡]" : "[内网核心]";
+	const label = `${scopeTag} [${host.ips.join("/")}] ${host.hostname ? `(${host.hostname})` : ""} ${node.isCompromised ? "⚡PWNED" : ""}`;
+	const tags = [
+		"host",
+		node.networkScope || "external",
+		...(node.isDC ? ["DC"] : []),
+		...(node.isCompromised ? ["compromised"] : []),
+	];
+	const detail = `区域: ${node.networkScope || "未知"} | 破门途径: ${node.compromiseVector || "未登记"} | OS: ${node.os || "unknown"} | 域: ${node.domain || "WORKGROUP"} | 服务: ${node.services.map((s) => s.port + "/" + s.protocol).join(", ") || "未探明"}`;
+	if (existingGraphNode) {
+		existingGraphNode.label = label;
+		existingGraphNode.tags = tags;
+		existingGraphNode.detail = detail;
+		if (node.isCompromised) existingGraphNode.status = "confirmed";
+	} else {
+		state.nodes.push({
+			id,
+			type: "finding",
+			label,
+			tags,
+			detail,
+			status: node.isCompromised ? "confirmed" : "open",
+			createdAt: new Date().toISOString(),
+		});
 	}
-	if (summary.length > 0) lastEditLines = summary.slice(0, 10);
-	return applied;
+	return node;
+}
+
+export function recordPivotSession(sess: {
+	id?: string;
+	sourceHostId: string;
+	tunnelType: "socks5" | "ssh_tun" | "cmd_pipe" | "webshell" | "frp";
+	localListenPort: number;
+	egressSubnets: string[];
+	status?: "active" | "dead";
+}): PivotSessionNode {
+	const id = sess.id || `pivot_${sess.tunnelType}_${sess.localListenPort}`;
+	const existing = state.sessions.find((s) => s.id === id);
+	const node: PivotSessionNode = {
+		id,
+		sourceHostId: sess.sourceHostId,
+		tunnelType: sess.tunnelType,
+		localListenPort: sess.localListenPort,
+		egressSubnets: sess.egressSubnets,
+		status: sess.status || "active",
+		createdAt: existing ? existing.createdAt : new Date().toISOString(),
+	};
+	if (existing) {
+		Object.assign(existing, node);
+	} else {
+		state.sessions.push(node);
+	}
+	const label = `跳板 [${sess.tunnelType}] :${sess.localListenPort} -> ${sess.egressSubnets.join(",")}`;
+	const existingGraphNode = state.nodes.find((n) => n.id === id);
+	if (!existingGraphNode) {
+		state.nodes.push({
+			id,
+			type: "capability",
+			label,
+			tags: ["pivot", sess.tunnelType, node.status],
+			detail: `出口网段: ${sess.egressSubnets.join(", ")} | 绑定端口: ${sess.localListenPort}`,
+			createdAt: new Date().toISOString(),
+		});
+		if (sess.sourceHostId && state.nodes.some((n) => n.id === sess.sourceHostId)) {
+			state.edges.push({ from: sess.sourceHostId, to: id, relation: "leads_to" });
+		}
+	}
+	return node;
+}
+
+export function recordCredential(cred: {
+	id?: string;
+	account: string;
+	domain?: string;
+	type: "plaintext" | "ntlm_hash" | "kerberos_ticket" | "ssh_key" | "api_key";
+	value: string;
+	originHostId: string;
+	privilegeScope?: "local_admin" | "domain_admin" | "domain_user" | "guest";
+	validTargets?: string[];
+}): CredentialNode {
+	const id = cred.id || `cred_${cred.type}_${cred.account}_${Date.now().toString(36).slice(-4)}`;
+	const existing = state.credentials.find((c) => c.id === id);
+	const node: CredentialNode = {
+		id,
+		account: cred.account,
+		domain: cred.domain,
+		type: cred.type,
+		value: cred.value,
+		originHostId: cred.originHostId,
+		privilegeScope: cred.privilegeScope || "domain_user",
+		validTargets: cred.validTargets || [],
+		createdAt: existing ? existing.createdAt : new Date().toISOString(),
+	};
+	if (existing) {
+		if (cred.validTargets && cred.validTargets.length > 0) {
+			const set = new Set([...existing.validTargets, ...cred.validTargets]);
+			node.validTargets = Array.from(set);
+		} else {
+			node.validTargets = existing.validTargets;
+		}
+		node.privilegeScope = cred.privilegeScope || existing.privilegeScope;
+		Object.assign(existing, node);
+	} else {
+		state.credentials.push(node);
+	}
+	const label = `凭据 [${cred.type}] ${cred.domain ? cred.domain + "\\" : ""}${cred.account} (${node.privilegeScope})`;
+	const existingGraphNode = state.nodes.find((n) => n.id === id);
+	if (!existingGraphNode) {
+		state.nodes.push({
+			id,
+			type: "finding",
+			label,
+			tags: ["credential", cred.type, node.privilegeScope],
+			detail: `来源: ${cred.originHostId} | 值: ${cred.value.slice(0, 4)}***`,
+			createdAt: new Date().toISOString(),
+		});
+		if (cred.originHostId && state.nodes.some((n) => n.id === cred.originHostId)) {
+			state.edges.push({ from: cred.originHostId, to: id, relation: "leads_to" });
+		}
+	}
+	return node;
+}
+
+export function findRouteForIp(ip: string): PivotSessionNode | null {
+	for (const s of state.sessions) {
+		if (s.status !== "active") continue;
+		for (const subnet of s.egressSubnets) {
+			if (matchSubnet(ip, subnet)) return s;
+		}
+	}
+	return null;
+}
+
+function matchSubnet(ip: string, subnet: string): boolean {
+	if (subnet === "0.0.0.0/0" || subnet === "*") return true;
+	if (ip === subnet) return true;
+	const parts = subnet.split("/");
+	if (parts.length === 1) {
+		return parts[0].endsWith(".") ? ip.startsWith(parts[0]) : ip === parts[0];
+	}
+	const [subIp, bitsStr] = parts;
+	const bits = Number.parseInt(bitsStr, 10);
+	if (Number.isNaN(bits) || bits < 0 || bits > 32) return false;
+	const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+	const ipNum = ipToInt(ip);
+	const subNum = ipToInt(subIp);
+	return (ipNum & mask) === (subNum & mask);
+}
+
+function ipToInt(ip: string): number {
+	const octets = ip.split(".").map((o) => Number.parseInt(o, 10));
+	if (octets.length !== 4 || octets.some((o) => Number.isNaN(o) || o < 0 || o > 255)) return 0;
+	return ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0;
+}
+
+// ---------------------------------------------------------------------------
+// 端点接口资产台账操作函数
+// ---------------------------------------------------------------------------
+
+export function recordEndpoint(params: {
+	url: string;
+	method?: string;
+	params?: string[];
+	authRequired?: boolean;
+	status?: EndpointStatus;
+	discoveredFrom?: string;
+}): EndpointNode {
+	state.endpoints ??= [];
+	const method = (params.method || "GET").toUpperCase() as EndpointNode["method"];
+	const cleanUrl = params.url.trim();
+	const existing = state.endpoints.find((e) => e.url === cleanUrl && e.method === method);
+
+	if (existing) {
+		if (params.params && params.params.length > 0) {
+			const set = new Set([...(existing.params || []), ...params.params]);
+			existing.params = Array.from(set);
+		}
+		if (params.status) existing.status = params.status;
+		if (params.authRequired !== undefined) existing.authRequired = params.authRequired;
+		return existing;
+	}
+
+	const id = `ep_${state.endpoints.length + 1}`;
+	const node: EndpointNode = {
+		id,
+		url: cleanUrl,
+		method,
+		params: params.params,
+		authRequired: params.authRequired,
+		status: params.status || "discovered",
+		discoveredFrom: params.discoveredFrom,
+		testedTimes: 0,
+	};
+	state.endpoints.push(node);
+	return node;
+}
+
+export function updateEndpointStatus(
+	idOrUrl: string,
+	status: EndpointStatus,
+	vuln?: string,
+): EndpointNode | null {
+	state.endpoints ??= [];
+	const ep = state.endpoints.find((e) => e.id === idOrUrl || e.url === idOrUrl);
+	if (!ep) return null;
+	ep.status = status;
+	ep.testedTimes = (ep.testedTimes || 0) + 1;
+	ep.lastTestedAt = new Date().toISOString();
+	if (vuln) {
+		ep.vulnerabilities ??= [];
+		if (!ep.vulnerabilities.includes(vuln)) ep.vulnerabilities.push(vuln);
+	}
+	return ep;
+}
+
+export function getAllEndpoints(): EndpointNode[] {
+	state.endpoints ??= [];
+	return state.endpoints;
+}
+
+export function getUnresolvedEndpoints(limit = 8): EndpointNode[] {
+	state.endpoints ??= [];
+	return state.endpoints
+		.filter((e) => e.status === "discovered" || e.status === "probing" || e.status === "bypassing")
+		.slice(0, limit);
 }

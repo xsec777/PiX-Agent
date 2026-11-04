@@ -11,7 +11,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai/compat";
 import { appendFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, "..");
+const SQLMAP_PY = join(ROOT, "tools", "02_Exploit", "sqlmap", "sqlmap.py").replace(/\\/g, "/");
 
 interface ScriptStep {
 	text?: string;
@@ -81,7 +86,7 @@ const SCRIPT: ScriptStep[] = [
 	{ text: "toolbox listed" },
 	{ toolCalls: [{ name: "toolbox", arguments: { action: "howto", tool: "sqlmap" } }] },
 	{ text: "sqlmap card read" },
-	{ toolCalls: [{ name: "bash", arguments: { command: 'python "E:/AProjs/Zcode/PiX/tools/02_Exploit/sqlmap/sqlmap.py" --version --batch' } }] },
+		{ toolCalls: [{ name: "bash", arguments: { command: `python "${SQLMAP_PY}" --version --batch` } }] },
 	{ text: "gate passed probe" }, // C2：读卡后同族命令放行（真跑 sqlmap --version）
 	{ toolCalls: [{ name: "toolbox", arguments: { action: "search", task: "目录爆破" } }] },
 	{ text: "dir search done" },
@@ -121,10 +126,49 @@ export default function (pi: ExtensionAPI) {
 				maxTokens: 8192,
 			},
 		],
-		streamSimple: (model, context) => {
-			const stream = createAssistantMessageEventStream();
-			const step = SCRIPT.shift() ?? { text: "(stub script exhausted)" };
-			turn += 1;
+			streamSimple: (model, context) => {
+				const stream = createAssistantMessageEventStream();
+
+				// 检测是否为后台 memory review 提取请求（不污染 SCRIPT 队列与 captures）
+				const isMemoryExtraction = (context.messages as Array<{ role?: string; content?: unknown }>).some(
+					(m) => {
+						const txt =
+							typeof m.content === "string"
+								? m.content
+								: Array.isArray(m.content)
+									? m.content.map((x) => (x as { text?: string })?.text ?? "").join(" ")
+									: "";
+						return (
+							txt.includes("operations") &&
+							(txt.includes("Save anything worth remembering") ||
+								txt.includes("durable memories") ||
+								txt.includes("The session is being compressed") ||
+								txt.includes("You review coding conversations"))
+						);
+					},
+				);
+
+				if (isMemoryExtraction) {
+					const base = {
+						role: "assistant" as const,
+						api: model.api,
+						provider: model.provider,
+						model: model.id,
+						usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+						timestamp: Date.now(),
+					};
+					queueMicrotask(() => {
+						const msg = { ...base, content: [{ type: "text" as const, text: '{"operations":[]}' }], stopReason: "stop" as const };
+						stream.push({ type: "start", partial: msg as never });
+						stream.push({ type: "text_delta", contentIndex: 0, delta: '{"operations":[]}' });
+						stream.push({ type: "text_end", contentIndex: 0, content: { type: "text", text: '{"operations":[]}' } });
+						stream.push({ type: "done", reason: "stop", message: msg as never });
+					});
+					return stream;
+				}
+
+				const step = SCRIPT.shift() ?? { text: "(stub script exhausted)" };
+				turn += 1;
 
 			// 捕获 system prompt：按 SystemMessage 协议重放全部 system messages，
 			// 得到最终的 pix section（before_agent_start 的 section 更新是后续 system message）

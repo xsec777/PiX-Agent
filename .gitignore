@@ -26,3 +26,9 @@ docs/PiX-画板可视化与归档滚动方案.md
 pix-state.json
 pix-state.tmp
 pix-snapshots/
+
+# 构建与二进制
+app/node_modules/
+app/dist/
+*.exe
+

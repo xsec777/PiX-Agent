@@ -37,7 +37,7 @@ export function failureRate(): { rate: number; full: boolean } {
 /** 可中止的 sleep：Agent 停止（abort）时立刻返回，不空转 */
 export function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
 	return new Promise((resolve) => {
-		if (ms <= 0) return resolve();
+		if (ms <= 0 || signal?.aborted) return resolve();
 		const timer = setTimeout(done, ms);
 		function done() {
 			signal?.removeEventListener("abort", done);

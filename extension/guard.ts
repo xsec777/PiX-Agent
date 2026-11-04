@@ -19,7 +19,7 @@ const DANGEROUS_BASH = [
 	"shutdown",
 	"reboot",
 	"halt -p",
-	// 全盘扫描类（e1-02 的 find / 挂死 13 分钟教训；find /e/Hacker 合法不拦）
+	// 全盘扫描类（e1-02 的 find / 挂死 13 分钟教训；find /data/tools 合法不拦）
 	"find / -",
 	"find /*",
 	// 补项（T9 深查）

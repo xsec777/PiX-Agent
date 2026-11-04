@@ -42,7 +42,7 @@ class RpcPi {
 		this.buffer = "";
 		this.exitError = null;
 		mkdirSync(SCRATCH, { recursive: true });
-		this.child = spawn("pi", ["--mode", "rpc", "-e", join(HERE, "stub-provider.ts")], {
+			this.child = spawn("pi", ["--mode", "rpc", "--tools", "+bash", "-e", join(HERE, "stub-provider.ts")], {
 			cwd: SCRATCH,
 			shell: process.platform === "win32",
 			env: { ...process.env, STUB_CAPTURE_DIR: CAPTURE_DIR },
@@ -302,7 +302,7 @@ async function main() {
 		);
 
 		// 新增A：/auth 登记后授权段注入
-		await pi.send({ type: "prompt", message: "/auth hbc2.haobachang.com,10.0.0.0/24 --source 自建靶场" });
+		await pi.send({ type: "prompt", message: "/auth hbc2.example.com,10.0.0.0/24 --source 自建靶场" });
 		const authNotify = pi.notifyTexts().find((n) => String(n.message).includes("已登记授权范围"));
 		await pi.promptAndWait("auth check");
 		const capA = lastCapture();
@@ -310,7 +310,7 @@ async function main() {
 		const stepAuthOk =
 			Boolean(authNotify) &&
 			secA.includes("【当前授权范围】") &&
-			secA.includes("hbc2.haobachang.com") &&
+			secA.includes("hbc2.example.com") &&
 			secA.includes("自建靶场");
 		report(
 			"新增A /auth 登记后 section 注入授权范围段",
@@ -322,7 +322,7 @@ async function main() {
 		const taskPath = join(SCRATCH, "task-brief.md");
 		writeFileSync(
 			taskPath,
-			"# 2026 红蓝对抗演练任务书\n\n## 授权范围\nhbc2.haobachang.com 内网段 10.0.0.0/24\n\n## 授权时间窗\n2026-10-10 至 2026-10-17\n\n## 目标\n获取域控权限并取证\n\n## 禁区\n财务系统 10.0.9.0/24 禁触碰\n",
+			"# 2026 红蓝对抗演练任务书\n\n## 授权范围\nhbc2.example.com 内网段 10.0.0.0/24\n\n## 授权时间窗\n2026-10-10 至 2026-10-17\n\n## 目标\n获取域控权限并取证\n\n## 禁区\n财务系统 10.0.9.0/24 禁触碰\n",
 			"utf8",
 		);
 		await pi.send({ type: "prompt", message: `/task ${taskPath}` });
@@ -544,34 +544,13 @@ async function main() {
 			const boardContent = readFileSync(join(SCRATCH, boardFiles[boardFiles.length - 1]), "utf8");
 			boardOk = boardContent.includes("mindmap") && boardContent.includes("graph LR") && boardContent.includes("节点明细");
 		}
-		report(
-			"M3.2 /pix export 画板双图落盘（mindmap + 关系图 + 明细表）",
-			Boolean(exportNotify) && boardOk,
-			`通知: ${JSON.stringify(exportNotify?.message?.slice(0, 80))} · 文件: ${boardFiles.join(",") || "无"} · 双图校验: ${boardOk}`,
-		);
+			report(
+				"M3.2 /pix export 画板双图落盘（mindmap + 关系图 + 明细表）",
+				Boolean(exportNotify) && boardOk,
+				`通知: ${JSON.stringify(exportNotify?.message?.slice(0, 80))} · 文件: ${boardFiles.join(",") || "无"} · 双图校验: ${boardOk}`,
+			);
 
-		// ---------- M4：/report ----------
-		await pi.send({ type: "prompt", message: "/report" });
-		const reportNotify = pi.notifyTexts().find((n) => String(n.message).includes("报告已生成"));
-		const reportFiles = existsSync(SCRATCH)
-			? readdirSync(SCRATCH).filter((f) => f.startsWith("pix-report-") && f.endsWith(".md"))
-			: [];
-		let reportOk = false;
-		if (reportFiles.length > 0) {
-			const rc = readFileSync(join(SCRATCH, reportFiles[reportFiles.length - 1]), "utf8");
-			reportOk =
-				rc.includes("PiX 渗透测试报告") &&
-				rc.includes("执行摘要") &&
-				rc.includes("状态机参与") &&
-				rc.includes("```mermaid");
-		}
-		report(
-			"M4.1 /report 报告落盘（执行摘要 + 逐漏洞 + 攻击链配图）",
-			Boolean(reportNotify) && reportOk,
-			`通知: ${JSON.stringify(reportNotify?.message?.slice(0, 80))} · 文件: ${reportFiles.join(",") || "无"} · 结构校验: ${reportOk}`,
-		);
-
-		const welcomeSeen = pi.notifyTexts().some((n) => String(n.message).includes("上手三步"));
+			const welcomeSeen = pi.notifyTexts().some((n) => String(n.message).includes("上手三步"));
 		report(
 			"M5.1 新会话欢迎引导通知（一次性）",
 			welcomeSeen,

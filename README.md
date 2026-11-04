@@ -18,8 +18,8 @@
 - 🧰 **自带工具箱**：31 个实测渗透工具 + 7 张扩展位卡，`toolbox` 网关按需发现（list / howto / search）
 - 🛡️ **双重护栏**：读卡门禁（未读卡禁调工具）+ 本机危险命令拦截 + 600s 超时注入
 - 📊 **画板知识继承**：状态跨会话持久化，下次开工自动继承上次画板（不重复侦察）
-- 🧾 **报告管线**：`/report` 一键生成（漏洞清单 + 攻击链 Mermaid 配图 + 证据闸门）
-- 🔬 **客观传感器**：连续拦截/报错自动触发止损提醒，不依赖 agent 自报
+- 🧾 **事实底表导出**：`/facts` 或 `/facts json` 一键导出不可篡改的 Ground Truth 纯事实底表（支持机器高保真 JSON 与表格化 Markdown），解耦排版，可无缝灌入任意自定义报告模板
+- 🔬 **客观传感器**：多维阻断模式识别（WAF/限流/人机/域认证），连续拦截自动触发止损并反向推荐实战 SOP
 
 ---
 
@@ -41,30 +41,32 @@
 | **Node.js ≥ 22** | pi / pi-web 运行时 | `winget install OpenJS.NodeJS.LTS` |
 | **Python 3.10+** | python 系工具（OneForAll/sqlmap 等）+ pi-web 补丁脚本 | `winget install Python.Python.3.10` |
 | **Git** | 拉取/更新仓库 | `winget install Git.Git` |
-| **Npcap** | nmap / naabu(SYN) / masscan 抓包驱动 | [npcap.com 官网下载](https://npcap.com/#download)（勾选 WinPcap 兼容模式） |
+| **Npcap** | nmap / masscan 抓包驱动 | [npcap.com 官网下载](https://npcap.com/#download)（勾选 WinPcap 兼容模式） |
 
 > Linux/macOS：工具卡路径为 Windows 口径，需自行改 `extension/toolbox-data.ts` 注册表路径。
 
 ---
 
-## 🚀 快速开始（一键）
+## 🚀 启动与关闭（成熟智能体专属控制台）
 
-```bash
-# 双击或运行一键启动脚本（自动检查 Node/pi/pi-web → 缺失则安装 → 部署扩展 → 启动 Web UI）
-scripts\pix-start.cmd
-```
+为提供工业级易用性，项目根目录预置了完整的管理启动与关闭脚本：
 
-启动后浏览器访问 **http://127.0.0.1:30141**；看到通知「PiX 已加载 · 模式=pent」即成功，全新会话再收到「上手三步」引导。
+| 启动器脚本 | 核心作用 | 使用说明 |
+|---|---|---|
+| **`启动器.cmd`** (或 `launcher.cmd`) | **全功能交互式控制台** | 双击打开交互菜单，实时显示服务运行状态（端口 30141 占用与 PID），支持 [1] 启动 Web [2] 终端模式 [3] 状态巡检 [4] 停止关闭 [5] 武器自检 |
+| **`pix-web.cmd`** | **一键极速启动 Web** | 双击直接同步扩展、启动 pi-web 并自动在浏览器打开 `http://127.0.0.1:30141`；控制台窗口明确提供关闭方式提示 |
+| **`pix-stop.cmd`** | **一键彻底关闭与清理** | 双击即可一键安全终止所有后台监听进程与守护程序，**强制释放端口 30141**，杜绝孤儿进程残留 |
+| **`pix.cmd`** | **终端交互直接对话** | 双击进入控制台全屏/终端直接对话模式 (pi CLI) |
 
-手动分步（等价于脚本内部动作）：
+### 快速启动与关闭姿势：
 
-```bash
-npm install -g @earendil-works/pi-coding-agent @agegr/pi-web   # 安装 pi 运行时
-node scripts/install.mjs                                      # 部署扩展
-scripts\pix-web.cmd                                          # Web UI 启动器（或 `pi` 进终端 TUI）
-```
-
-启动后应看到通知 **「PiX 已加载 · 模式=pent · 节奏=自适应 2s」**；全新会话再收到「上手三步」引导。
+1. **方式 1：双击 `启动器.cmd`（推荐）**
+   - 查看当前服务是否处于运行状态；
+   - 输入 `1` 回车启动 Web 工作台并自动打开浏览器；
+   - 需要关闭时，在菜单中输入 `4` 即可一键安全关闭所有服务。
+2. **方式 2：双击 `pix-web.cmd` 启动，双击 `pix-stop.cmd` 关闭**
+   - 随时双击 `pix-web.cmd` 开工；
+   - 测试结束或需要释放端口时，随时双击 `pix-stop.cmd` 彻底收工。
 
 ## 🔑 配置模型（必须）
 
@@ -88,7 +90,7 @@ pi 默认无可用模型，首次使用需在 **pi-web 设置 → 模型** 或 `
 
 - **浏览器控制**：自配 `chrome-devtools-mcp`（`npx chrome-devtools-mcp@latest`）
 - **抓包/重放**：自配 Burp Suite MCP bridge
-- **技能包**：PiX 自带两个兜底技能（`pix-workflow` / `pix-report`）；如需完整渗透/红队技能包，把技能目录加入 pi 技能路径即可，PiX 条令第 0 条自动让位
+- **技能包**：PiX 自带兜底作战技能（`pix-workflow`）；如需完整渗透/红队技能包，把技能目录加入 pi 技能路径即可，PiX 条令第 0 条自动让位
 
 ---
 
@@ -157,17 +159,16 @@ toolbox({action:"search", task:"目录爆破"})      # 任务关键词 → top3 
 toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势/硬约束/参数/陷阱
 ```
 
-**内置注册表 = 38 张工具卡**（31 实测 + 7 扩展位：隧道/代理 5、提权枚举 3，转子女神已剔除）：
+**内置注册表 = 38 款纯 CLI 实战武器**（全部实测可用，随包 tools/ 分发，AI 原生无头可调）：
 
-| 分类 | 工具 |
+| 分类 | 核心武器 (38 款) |
 |---|---|
-| 信息收集 | subfinder / OneForAll / crt.sh / httpx / EHole / nmap / naabu / masscan / dirsearch / ffuf / URLFinder / LinkFinder / katana / waybackurls |
-| 漏洞利用 | sqlmap / nuclei(+templates) / jwt_tool / JWTCrack |
-| 内网横向 | fscan / netexec / impacket（+ chisel / frp / proxychains / ssh-tunnel / socat 扩展位） |
-| 逆向/容器 | capa / radare2 / yara-x / trivy / strings-bin |
-| 云只读 | aws-cli / az-cli / gcloud-ro / kubectl-ro |
+| 信息收集 (14) | subfinder / OneForAll / crt.sh / httpx / EHole / nmap / masscan / dirsearch / ffuf / URLFinder / LinkFinder / katana / waybackurls / **rotor-goddess (转子女神-rg_cli)** |
+| 漏洞利用 (4) | sqlmap / nuclei(+templates) / jwt_tool / JWTCrack |
+| 内网横向与域攻坚 (13) | **fscan** / **netexec (nxc)** / **impacket** / **certipy (ADCS域提权)** / **bloodhound (域拓扑采集)** / **pypykatz (内存密码抓取)** / **ligolo-ng (极速TUN穿透)** / chisel / frp / proxychains / nc / winpeas / linpeas |
+| 逆向与攻坚 (7) | capa / radare2 / yara-x / strings-bin / kubectl-ro |
 
-**纪律**：凡调用注册表工具，先 `toolbox howto` 读卡再拼命令——未读卡会被门禁拦截（这是故意的）。`/toolbox export` 可导出全量工具卡手册（单文件 MD）。
+**模式与调用**：武器全部适配 AI 直接 CLI 执行；`/toolbox export` 可导出全量工具卡手册（单文件 MD）。
 
 ## 📖 命令与工具参考
 
@@ -177,16 +178,24 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 | `/auth <目标...> --source <来源>` | 登记授权范围（注入围栏） |
 | `/task <任务书.md>` | 登记红队任务书 |
 | `/pix` · `/pix export` | 状态总览 / 画板双 Mermaid 落盘 |
-| `/report` | 渗透报告（漏洞清单 + 攻击链配图 + 证据闸门） |
+| `/facts` · `/facts json` | 导出不可篡改的 Ground Truth 纯事实底表（Markdown / 机器高保真 JSON，含资产、跳板、凭据、台账、漏洞原始请求包） |
 | `/toolbox export` | 全量工具卡手册导出 |
 
 | 工具 | 用途 |
 |---|---|
+| `record_host` | 登记内网主机资产（IP、系统、所属域、DC、PWNED控制状态、开放端口），智能增量合并服务 |
+| `record_pivot` | 登记内网跳板与隧道（Socks5/FRP/SSH/TUN），建立内网网段透明路由映射 |
+| `record_cred` | 登记已收割凭据（明文/NTLM/Kerberos/SSH），管理权限等级与已打通的内网主机 |
+| `record_endpoint` | 登记 Web/API 接口资产台账（URL、方法、参数、来源），建立 100% 闭环测试追踪 |
+| `update_endpoint` | 流转接口状态机（probing 探针 -> bypassing 绕过 -> confirmed 坐实 / rejected 排除） |
+| `consult_tactics` | 即时动态检索内网横向、AD 域攻坚、隧道穿透与攻击面测绘顶级战术 SOP |
+| `pivot_exec` | 目标处于内网时自动生成并注入原生代理参数或 proxychains 代理链路由命令 |
 | `record_fact` / `record_capability` / `record_failure` | 画板记节点 + 连边 / 能力 / 失败计数（≥6 触发回读） |
-| `update_node` | 节点状态流转（confirmed 联动节奏窗口） |
-| `get_state` / `get_task` | 读画板全量 / 任务书全文 |
+| `update_node` | 节点状态流转（confirmed 联动节奏窗口与事实图谱坐实） |
+| `get_state` / `get_task` | 读 4D 超图全量状态 / 任务书全文 |
 | `export_map` | Mermaid 关系图（会话内返回） |
-| `toolbox` | 工具注册表网关 |
+| `export_facts` | 一键导出客观事实底表（JSON / Markdown 双模态） |
+| `toolbox` | 工具注册表网关（list / howto / search） |
 
 ## 🧪 验收
 

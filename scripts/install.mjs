@@ -27,7 +27,7 @@ import { execSync, spawnSync } from "node:child_process";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const EXT_SRC = join(ROOT, "extension");
 const EXT_DST = join(homedir(), ".pi", "agent", "extensions", "pix");
-const FILES = ["index.ts", "state.ts", "rules.ts", "pacing.ts", "guard.ts", "gate.ts", "sensor.ts", "mirror.ts", "toolbox.ts", "toolbox-data.ts", "report.ts", "package.json", "package-lock.json"];
+const FILES = ["index.ts", "state.ts", "rules.ts", "pacing.ts", "guard.ts", "gate.ts", "sensor.ts", "mirror.ts", "toolbox.ts", "toolbox-data.ts", "pivot-router.ts", "tactical-loader.ts", "exporter.ts", "sniffer.ts", "package.json", "package-lock.json"];
 
 /** 路径配置链（改良8）：install 时把实际仓库 tools 根写入 pix-config.json，跨机分发零手工 */
 function writePixConfig() {
@@ -77,7 +77,19 @@ function installExt() {
 }
 
 function patchWeb() {
-	const script = join(ROOT, "scripts", "patch-piweb.py");
+		// 同步定制版 pi-web-source 构建产物
+		const customNext = join(ROOT, "pi-web-source", ".next");
+		const globalNext = join(homedir(), "AppData", "Roaming", "npm", "node_modules", "@agegr", "pi-web", ".next");
+		if (existsSync(customNext) && existsSync(dirname(globalNext))) {
+			try {
+				cpSync(customNext, globalNext, { recursive: true, force: true });
+				console.log("✓ 定制版 PiX UI (.next 构建产物) 已同步至全局 pi-web");
+			} catch (e) {
+				console.log("同步定制 UI 构建产物提示:", e.message);
+			}
+		}
+
+		const script = join(ROOT, "scripts", "patch-piweb.py");
 	try {
 		execSync(`python "${script}"`, { stdio: "inherit" });
 	} catch {

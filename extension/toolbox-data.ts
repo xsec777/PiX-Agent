@@ -11,6 +11,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 
 type ToolRuntime = "direct" | "python" | "java";
 export type ToolCategory =
@@ -61,10 +62,43 @@ try {
 }
 
 export const TOOLS_ROOT =
-	process.env.PIX_TOOLS_ROOT ?? pixConfig.toolsRoot ?? "E:\\AProjs\\Zcode\\PiX\\tools";
+	process.env.PIX_TOOLS_ROOT ?? pixConfig.toolsRoot ?? join(EXT_DIR, "..", "tools");
 
-export const PY310 =
-	process.env.PIX_PY310 ?? pixConfig.py310 ?? "E:\\env\\python3106\\python.exe";
+function resolvePython(): string {
+	if (process.env.PIX_PY310 && existsSync(process.env.PIX_PY310)) {
+		return process.env.PIX_PY310;
+	}
+	if (pixConfig.py310 && existsSync(pixConfig.py310)) {
+		return pixConfig.py310;
+	}
+	// 动态嗅探系统 PATH
+	try {
+		const out = execSync(process.platform === "win32" ? "where python" : "which python3", {
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+			timeout: 1000,
+		});
+		const first = out
+			.split(/\r?\n/)
+			.map((l) => l.trim())
+			.find((l) => l.length > 0 && existsSync(l));
+		if (first) return first;
+	} catch {}
+
+	// 历史常用盘符路径兜底探测
+	const commonPaths = [
+		"E:\\env\\python3106\\python.exe",
+		"C:\\Python310\\python.exe",
+		"C:\\Python311\\python.exe",
+	];
+	for (const p of commonPaths) {
+		if (existsSync(p)) return p;
+	}
+
+	return "python";
+}
+
+export const PY310 = resolvePython();
 
 export const TOOLBOX: ToolCard[] = [
 	// ------------------------------------------------ recon · 子域
@@ -152,20 +186,6 @@ export const TOOLBOX: ToolCard[] = [
 		params: ["-sV 服务版本", "-Pn 跳过 ping", "-T3 模板（≤3）", "-oX XML 输出", "--script NSE"],
 		rate: "-T3；扫描段越大越要保守",
 		traps: ["UDP 扫描慢且不可靠，明确需要才 -sU"],
-	},
-	{
-		name: "naabu",
-		category: "recon",
-		aliases: ["快速端口", "syn 扫描", "端口发现"],
-		purpose: "快速端口发现（SYN/CONNECT/被动），nmap 的前置筛",
-		tested: true,
-		runtime: "direct",
-		path: TOOLS_ROOT + "\\01_AssetScan\\naabu\\naabu.exe",
-		invocation: "<path> -host <目标> -top-ports 1000 -rate 500 -auth=false -j -o <输出.jsonl>",
-		hardRules: ["必加 -auth=false（默认连 PD 云鉴权，离线会卡死）", "SYN 模式需 Npcap+管理员，无权限自动降 CONNECT", "rate 从 500 起步，护网更低"],
-		params: ["-host/-list 目标", "-top-ports 100/1000/full", "-rate 500", "-auth=false", "-nmap-cli 一段出服务版本", "-passive Shodan 被动", "-exclude-cdn"],
-		rate: "-rate 500 起步",
-		traps: ["只答开没开；服务版本用 -nmap-cli 或交 nmap", "IPv6 不需要时 -ip-version 4"],
 	},
 	{
 		name: "masscan",
@@ -355,17 +375,6 @@ export const TOOLBOX: ToolCard[] = [
 		hardRules: ["CLI 名为 yr（yara-x 1.21+）；规则语法与经典 YARA 高度兼容但个别模块不同"],
 	},
 	{
-		name: "trivy",
-		category: "reverse",
-		aliases: ["sca", "组件漏洞", "依赖扫描"],
-		purpose: "SCA 组件漏洞扫描（文件系统/依赖清单，配合代码审计）",
-		tested: true,
-		runtime: "direct",
-		path: TOOLS_ROOT + "\\04_Misc\\trivy\\trivy.exe",
-		invocation: "<path> fs <目录> --format json -o <输出.json>",
-		hardRules: ["首次运行联网更新漏洞库；离线环境加 --skip-db-update"],
-	},
-	{
 		name: "strings-bin",
 		category: "reverse",
 		aliases: ["字符串提取", "strings"],
@@ -407,7 +416,7 @@ export const TOOLBOX: ToolCard[] = [
 		purpose: "内网协议验证（SMB/WinRM/LDAP/MSSQL 凭据喷洒与枚举，fscan 精细化）",
 		tested: true,
 		runtime: "direct",
-		path: "E:\\env\\python3146\\Scripts\\nxc.exe",
+		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe") ? TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe" : "E:\\env\\python3146\\Scripts\\nxc.exe",
 		invocation: "<path> smb <目标> -u <用户> -p <密码> --shares",
 		hardRules: ["redt 模式须任务书覆盖；凭据喷洒单轮低频", "需 Python 3.11+（pip 装 git+https://github.com/Pennyw0rth/NetExec；PyPI 已无 netexec 包）"],
 	},
@@ -418,48 +427,12 @@ export const TOOLBOX: ToolCard[] = [
 		purpose: "AD/Windows 协议套件（secretsdump/psexec/wmiexec 等后渗透动作）",
 		tested: true,
 		runtime: "python",
-		path: "E:\\env\\python3106\\Scripts\\secretsdump.py",
+		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py") ? TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py" : "E:\\env\\python3106\\Scripts\\secretsdump.py",
 		invocation: "<runtime> <path> <域>/<用户>:<密码>@<目标> <域>/<用户>:<密码>@<目标>",
 		hardRules: ["redt 专属：任务书明示允许才用；动作全部留证", "示例脚本在 <runtime> 同级 Scripts/ 下"],
 	},
 	// ------------------------------------------------ cloud（只读口径）
-	{
-		name: "aws-cli",
-		category: "cloud",
-		aliases: ["aws", "s3", "云凭证"],
-		purpose: "AWS 只读枚举（SSRF 拿到云凭证后的资源面确认）",
-		tested: true,
-		runtime: "direct",
-		path: "E:\\env\\python3106\\Scripts\\aws.cmd",
-		invocation: "<path> s3 ls --profile <凭证>；<path> sts get-caller-identity",
-		hardRules: ["只读枚举（ls/get/list 类）；禁任何写/删操作"],
-		installHint: "环境依赖：PY310 Scripts 下的 pip 包（awscli）",
-	},
-	{
-		name: "az-cli",
-		category: "cloud",
-		aliases: ["azure", "az", "云凭证"],
-		purpose: "Azure 只读枚举（SSRF 拿到云凭证/token 后的资源面确认）",
-		tested: true,
-		runtime: "direct",
-		path: "E:\\env\\python3106\\Scripts\\az.bat",
-		invocation: "<path> account show；<path> webapp list；<path> storage container list",
-		hardRules: ["只读枚举（show/list/get 类）；禁任何写/删操作"],
-		installHint: "环境依赖：PY310 Scripts 下的 pip 包（azure-cli）；离线料在 tools/05_Cloud/wheels",
-	},
 
-	{
-		name: "gcloud-ro",
-		category: "cloud",
-		aliases: ["gcp", "google cloud", "云凭证"],
-		purpose: "GCP 只读枚举（SSRF 拿到元数据凭证后的资源面确认）",
-		tested: true,
-		runtime: "direct",
-		path: TOOLS_ROOT + "\\04_Misc\\gcloud\\google-cloud-sdk\\bin\\gcloud.cmd",
-		invocation: "<path> storage ls gs://<bucket>；<path> compute instances list --project <proj>",
-		hardRules: ["只读（ls/list/describe）；禁 create/delete/set 操作", "凭证经 CLOUDSDK_CORE_ACCOUNT/GOOGLE_APPLICATION_CREDENTIALS 注入，勿写配置文件"],
-		installHint: "随包内置（tools\\04_Misc\\gcloud），无需安装",
-	},
 	{
 		name: "kubectl-ro",
 		category: "cloud",
@@ -477,7 +450,7 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["隧道", "tunnel", "socks5", "内网穿透", "socks"],
 		purpose: "内网隧道：把边缘节点/本机流量经 socks5/TCP 通道转发进内网",
-		tested: false,
+		tested: true,
 		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\chisel\\chisel.exe",
 		invocation: "<path> client <边缘IP>:<port> R:<远程端口>:127.0.0.1:<本地端口>；socks 动态转发加 R:socks",
@@ -498,7 +471,7 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["内网穿透", "frps", "frpc", "隧道"],
 		purpose: "内网穿透：frps/frpc 架构把内网服务映射到边缘节点",
-		tested: false,
+		tested: true,
 		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\frp\\frpc.exe",
 		invocation: "<runtime> -c <frpc.toml>（config 由本地模板水合：server_addr/remote_port/type=socks 等）",
@@ -516,9 +489,8 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["代理链", "socks 代理", "proxychains4"],
 		purpose: "把本机命令的流量经 socks 代理链转发进内网（配合 chisel/frp 隧道）",
-		tested: false,
-		runtime: "python",
-		runtimePath: PY310,
+		tested: true,
+		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\proxychains\\proxychains4.exe",
 		invocation: "<path> -f <代理链配置> <命令>（配置：socks5 127.0.0.1 <隧道本地端口>）",
 		hardRules: [
@@ -551,7 +523,7 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["端口转发", "中继", "tcp 转发"],
 		purpose: "TCP/UDP 端口转发与中继（不依赖 SSH 的双向盲转发）",
-		tested: false,
+		tested: true,
 		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\socat\\socat.exe",
 		invocation: "<path> TCP-LISTEN:<本地端口>,fork,reuseaddr TCP:<目标>:<目标端口>",
@@ -568,7 +540,7 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["提权", "peass", "linux 枚举", "suid"],
 		purpose: "Linux 提权枚举：SUID/环境变量/内核/服务弱权限/凭证检索一键出报告",
-		tested: false,
+		tested: true,
 		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\linpeas\\linpeas.sh",
 		invocation: "bash <path> -a > <输出文件> 2>&1（上传目标后执行）",
@@ -586,7 +558,7 @@ export const TOOLBOX: ToolCard[] = [
 		category: "intranet",
 		aliases: ["提权", "peass", "windows 枚举"],
 		purpose: "Windows 提权枚举：服务弱权限/未防护路径/token 权限/凭据检索一键出报告",
-		tested: false,
+		tested: true,
 		runtime: "direct",
 		path: TOOLS_ROOT + "\\03_Intranet\\winpeas\\winPEASx64.exe",
 		invocation: "<path> quiet cmd fast -outputfile <输出文件>",
@@ -600,19 +572,98 @@ export const TOOLBOX: ToolCard[] = [
 		installHint: "下载 https://github.com/peass-ng/PEASS-ng/releases（winPEASx64.exe）放 tools/03_Intranet/winpeas/",
 	},
 	{
-		name: "suid-scan",
+		name: "nc",
 		category: "intranet",
-		aliases: ["提权", "suid", "linux 枚举", "setuid"],
-		purpose: "SUID 位文件枚举 + 风险匹配（自定义姿势模板卡，无二进制，Linux 目标侧执行）",
-		tested: false,
+		aliases: ["netcat", "nc64", "反弹shell", "监听", "交互"],
+		purpose: "网络瑞士军刀（端口监听、反弹 Shell 接收、RAW TCP 数据收发、端口探测）",
+		tested: true,
 		runtime: "direct",
-		invocation: "find / -perm -4000 -type f 2>/dev/null（目标侧 shell 通道内执行；按目标 OS 取 bash/sh）",
+		path: TOOLS_ROOT + "\\03_Intranet\\nc\\nc64.exe",
+		invocation: "<path> -lvvp <监听端口>；<path> -zv <目标IP> <端口>",
+		hardRules: ["反弹 shell 监听端口避免占用常用业务端口", "会话结束确保关闭常驻监听进程"],
+		params: ["-lvvp 详细多重监听", "-zv 快速端口探活", "-e 绑定程序执行"],
+	},
+			{
+		name: "rotor-goddess",
+		category: "recon",
+		aliases: ["转子女神", "rg", "js哥伦布", "js提取", "js分析"],
+		purpose: "JS 深度逆向与接口端点提取（全面解析前端 JS，提取隐藏 API、AK/SK 凭据与威胁参数）",
+		tested: true,
+		runtime: "python",
+		runtimePath: PY310,
+		path: join(TOOLS_ROOT, "01_AssetScan", "转子女神", "转子女神-JS哥伦布v1.2.6", "rg_cli.py"),
+		workdir: join(TOOLS_ROOT, "01_AssetScan", "转子女神", "转子女神-JS哥伦布v1.2.6"),
+		invocation: "<runtime> <path> -u <目标URL> -o <输出目录> -t 900",
 		hardRules: [
-			"目标侧命令仅走已拿到的 shell 通道（本机 bash 不是目标机 shell）",
-			"SUID 命中与 GTFOBins 已知提权链匹配后才设计利用，禁盲试",
+			"严禁裸调 exe：必须通过 rg_cli.py 封装调用，防止等待键盘输入死循环",
+			"大型 SPA 单页站需 5~15 分钟解析，超时阈值请设 ≥900s",
+			"产物会自动蒸馏为 summary.json 与 endpoints.txt，提取后使用 record_fact 入账",
 		],
-		params: ["-perm -4000 SUID 查找", "-perm -2000 SGID"],
-		installHint: "无二进制：姿势模板卡，直接走目标 shell 通道",
+		params: ["-u 目标URL", "-o 输出目录", "-t 超时秒数", "--json 输出纯JSON"],
+		rate: "深度静态/动态渲染分析，单站耗时较长",
+		traps: ["不清代理会走系统代理报错，rg_cli 已内置环境清理"],
+	},
+
+	{
+		name: "certipy",
+		category: "intranet",
+		aliases: ["adcs", "证书服务", "esc1", "esc8", "域提权", "证书"],
+		purpose: "Active Directory 证书服务 (ADCS) 枚举与滥用（ESC1~ESC13 模板分析、证书申请、Shadow Credentials 域管提权）",
+		tested: true,
+		runtime: "direct",
+		path: join(TOOLS_ROOT, "03_Intranet", "certipy", "certipy.exe"),
+		invocation: "<path> find -u <用户>@<域> -p <密码> -dc-ip <域控IP> -stdout -vulnerable",
+		hardRules: [
+			"域内提权核心利器：优先使用 find -vulnerable 快速定位高危可滥用模板 (ESC1/ESC8 等)",
+			"申请证书前 record_fact 说明目标模板与身份，证书产物落本地并及时 auth 提取 hash",
+			"若目标机器支持 Web 注册，配合 certipy relay 执行 NTLM 中继攻击",
+		],
+		params: ["find 枚举脆弱模板", "req 申请证书", "auth 使用证书认证获取NTLM Hash", "ca 枚举CA服务"],
+	},
+	{
+		name: "bloodhound",
+		category: "intranet",
+		aliases: ["域拓扑", "bloodhound", "acl分析", "域关系", "域分析"],
+		purpose: "Active Directory 域环境全量 ACL 关系、会话、用户组与最短攻击路径数据采集",
+		tested: true,
+		runtime: "direct",
+		path: join(TOOLS_ROOT, "03_Intranet", "bloodhound", "bloodhound-ce-python.exe"),
+		invocation: "<path> -d <域名> -u <用户名> -p <密码> -dc <域控IP> -gc <全局编录> -c All --zip -op <输出前缀>",
+		hardRules: [
+			"-c All 全量采集域信息；--zip 自动打包 JSON 产物供离线/导入分析",
+			"若无明文密码可用 --hashes LM:NTLM 进行 Hash 认证；单轮采集低频防止触发 NDR 警报",
+		],
+		params: ["-d 域名", "-u 用户名", "-p 密码", "--hashes NTLM哈希", "-dc 域控IP", "-c 采集方法(All/Default)", "--zip 打包"],
+	},
+	{
+		name: "pypykatz",
+		category: "intranet",
+		aliases: ["mimikatz", "抓密码", "lsass", "dump密码", "内存密码"],
+		purpose: "从 Windows 内存/LSASS dump 中提取明文口令、NTLM Hash 与 Kerberos 凭据",
+		tested: true,
+		runtime: "direct",
+		path: join(TOOLS_ROOT, "03_Intranet", "pypykatz", "pypykatz.exe"),
+		invocation: "<path> live lsa；或 <path> lsa minidump <lsass.dmp路径>",
+		hardRules: [
+			"提取到 Hash / 明文后立即调用 record_cred 入金库，不依赖模型单轮记忆",
+			"实战中推荐先离线转储 lsass 内存文件再解析，规避 EDR/杀软对高危内存直接读取的阻断",
+		],
+		params: ["live lsa 本机实时抓取", "lsa minidump 解析转储文件", "registry 解析 SAM/SYSTEM 文件"],
+	},
+	{
+		name: "ligolo-ng",
+		category: "intranet",
+		aliases: ["ligolo", "tun隧道", "虚拟网卡穿透", "极速穿透", "底层路由"],
+		purpose: "基于 TUN 虚拟网卡的下一代极速内网穿透（本地直通内网所有网段与协议，免去 proxychains 代理链）",
+		tested: true,
+		runtime: "direct",
+		path: join(TOOLS_ROOT, "03_Intranet", "ligolo-ng", "proxy.exe"),
+		invocation: "<path> -selfcert -laddr 0.0.0.0:<端口>；目标机执行: agent.exe -connect <攻击机IP>:<端口> -ignore-cert",
+		hardRules: [
+			"极速穿透首选：在攻击机起 proxy 监听，目标机放行 agent 连接；上线后添加路由直连内网",
+			"测试结束后关闭 tunnel 并在系统清理虚拟网卡与路由表",
+		],
+		params: ["-selfcert 自动自签名", "-laddr 监听地址与端口"],
 	},
 ];
 

@@ -148,9 +148,9 @@ export function registerToolboxTool(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "toolbox",
 		label: "渗透工具箱",
-		description:
-			"渗透工具注册表网关。action=list 列全量工具（分类分组）；action=howto 查单个工具卡（唯一姿势/硬约束/参数/陷阱）；" +
-			"action=search 按任务关键词找工具（返回 top3 候选）。凡调用本地 CLI 工具，必须先 howto 读卡再拼命令。",
+			description:
+				"渗透工具注册表网关。action=list 列全量工具（分类分组）；action=howto 查单个工具卡（最佳姿势/参数/陷阱）；" +
+				"action=search 按任务关键词找工具（返回 top3 候选）。可按需查阅，直接在命令行中调用相应工具。",
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("list"), Type.Literal("howto"), Type.Literal("search")], {
 				description: "list=全量清单 / howto=单个工具卡 / search=按任务找工具",

@@ -1,3 +1,5 @@
+import { wrapCommandWithPivot } from "./pivot-router.ts";
+import { searchTactics, readTacticalSOP } from "./tactical-loader.ts";
 /**
  * PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）
  *
@@ -15,7 +17,6 @@
  *   sensor.ts 止损观察器（连续拦截/报错 → 回读）+ 记账提醒
  *   mirror.ts 落库调用 → 画板镜像（提案即镜像，不依赖 MCP 连通）
  *   toolbox.ts / toolbox-data.ts 工具箱网关（list/howto/search + 39 卡注册表）
- *   report.ts /report 报告管线
  *   index.ts  本文件：事件钩子 + 命令 + 工具注册
  *
  * API 签名依据：@earendil-works/pi-coding-agent@1.1.0 dist/core/extensions/types.d.ts
@@ -27,7 +28,6 @@ import { Type } from "typebox";
 import {
 	FAILURE_THRESHOLD,
 	getState,
-	mergeBoardEdits,
 	nextId,
 	persist,
 	pushResult,
@@ -36,6 +36,14 @@ import {
 	setMode,
 	updateNodeStatus,
 	readStateSnapshot,
+	getAllHosts,
+	getAllSessions,
+	getAllCredentials,
+	recordHost,
+	recordPivotSession,
+	recordCredential,
+	recordEndpoint,
+	updateEndpointStatus,
 	historySummary,
 	setHistoryLines,
 	resetSectionLines,
@@ -45,14 +53,15 @@ import {
 	type Relation,
 	type NodeType,
 	type NodeStatus,
+	type EndpointStatus,
 	type Mode,
 } from "./state.ts";
 import { currentDelayMs, failureRate, sleep } from "./pacing.ts";
 import { buildSection } from "./rules.ts";
 import { detectDangerous } from "./guard.ts";
 import { checkCardGate, ensureTimeout } from "./gate.ts";
-import { countExternalAction, noteLedger, noteResult } from "./sensor.ts";
-import { mirrorPentrackCall } from "./mirror.ts";
+import { countExternalAction, noteLedger, noteResult, resetSensors } from "./sensor.ts";
+import { mirrorPentrackCall, resetMirror } from "./mirror.ts";
 import { registerToolboxTool } from "./toolbox.ts";
 import { loadRegistry } from "./toolbox.ts";
 
@@ -132,6 +141,14 @@ const STATE_TOOL_NAMES = new Set([
 	"export_map",
 	"update_node",
 	"toolbox",
+	"record_host",
+	"record_pivot",
+	"record_cred",
+	"record_endpoint",
+	"update_endpoint",
+	"consult_tactics",
+	"pivot_exec",
+	"export_facts",
 ]);
 
 /** 本地文件类工具：不碰目标，不占节奏（动静结合的"静"不睡） */
@@ -144,15 +161,12 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 	pi.on("session_start", (event, ctx) => {
 		// 会话级 section 注入行重置：防上一会话的历史画板摘要/画板编辑提示泄漏到本会话
-		resetSectionLines();
-		const entries = ctx.sessionManager.getEntries() as unknown[];
-		const { restored, migrated } = restoreFromEntries(pi, entries);
-		// 恢复时消费历史画板编辑条目（v3 画板时代的兼容读回；UI 已下线不再产生新条目）
-		try {
-			const f = ctx.sessionManager.getSessionFile();
-			if (f) mergeBoardEdits(pi, f);
-		} catch {}
-		// 历史画板读回：全新会话 + cwd 存在 pix-state.json → 注入【历史画板】摘要（不并入 state 本体）
+			resetSectionLines();
+			resetSensors();
+			resetMirror();
+			const entries = ctx.sessionManager.getEntries() as unknown[];
+			const { restored, migrated } = restoreFromEntries(pi, entries);
+			// 历史画板读回：全新会话 + cwd 存在 pix-state.json → 注入【历史画板】摘要（不并入 state 本体）
 		// 注意：必须在 persist（覆盖 cwd 存档）之前读取——persist 会把当前状态写入，可能冲掉上一会话快照
 		let historyNote = "";
 		if (!restored && !migrated) {
@@ -178,10 +192,10 @@ export default function (pi: ExtensionAPI) {
 			"info",
 		);
 		if (!restored && state.nodes.length === 0 && !state.auth && !state.task && !historyNote) {
-			ctx.ui.notify(
-				"上手三步：①设置→模型 填 API Key（未配）②/ 查看命令（/auth 登记授权、/pix 总览）③直接对话开工。\n工具箱：toolbox({action:'list'}) 查 39 张工具卡（31 实测+8 扩展位）；/report 出报告；/pix export 导出画板。",
-				"info",
-			);
+					ctx.ui.notify(
+						"上手三步：①设置→模型 填 API Key（未配）②/ 查看命令（/auth 登记授权、/task 任务书、/pix 总览）③直接对话开工。\n工具箱：toolbox({action:'list'}) 查 38 款内置 CLI 工具；/pix export 导出画板超图。",
+						"info",
+					);
 		}
 	});
 
@@ -215,18 +229,12 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	// -----------------------------------------------------------------------
-	// before_agent_start：sections 注入（键固定 "pix"，保提示前缀稳定）
-	// 先按水位线消费磁盘上的历史画板编辑条目（pix-board-edit），再构建 section。
-	// 画板 UI 已下线；此路径仅服务老会话兼容读回。
-	// -----------------------------------------------------------------------
-	pi.on("before_agent_start", (event, ctx) => {
-		try {
-			const f = ctx?.sessionManager?.getSessionFile?.();
-			if (f) mergeBoardEdits(pi, f);
-		} catch {}
-		event.systemPromptOptions.sections.pix = buildSection();
-	});
+		// -----------------------------------------------------------------------
+		// before_agent_start：sections 注入（键固定 "pix"，保提示前缀稳定）
+		// -----------------------------------------------------------------------
+		pi.on("before_agent_start", (event) => {
+			event.systemPromptOptions.sections.pix = buildSection();
+		});
 
 	// -----------------------------------------------------------------------
 	// tool_execution_start：节奏控制（对外部动作工具 sleep，簿记/本地文件工具豁免）
@@ -284,28 +292,57 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 	// tool_result：传感器（止损观察/超时未知）+ 入账清零
 	// -----------------------------------------------------------------------
-	pi.on("tool_result", (event) => {
-		if (STATE_TOOL_NAMES.has(event.toolName)) {
-			noteLedger(); // 簿记工具结果=入账（record_*/get_state 等）
-			return;
-		}
-		if (event.toolName.startsWith("mcp__pentrack__")) {
-			noteLedger(); // 镜像已在 tool_call 落节点=入账
-			return;
-		}
-		const text =
-			event.content
-				.map((c) => (c.type === "text" ? c.text : ""))
-				.join("\n") + (event.isError ? " (error)" : "");
-		const { timeout } = noteResult(event.isError, text);
-		// R7：被熔断命令标注「结果未知≠失败」（YJ outcome_unknown 语义）
-		if (timeout) {
-			(event.content as Array<{ type: string; text?: string }>).push({
-				type: "text",
-				text: "【PiX】命令超时被熔断：结果未知≠失败——先核实副作用（是否已打到目标/是否留下进程/文件），未核实前禁止原样重发同一命令。",
-			});
-		}
-	});
+		pi.on("tool_result", async (event) => {
+			if (event.toolName.startsWith("record_") || event.toolName === "update_node") {
+				noteLedger(); // 事实写入类簿记工具=入账清零
+				return;
+			}
+			if (STATE_TOOL_NAMES.has(event.toolName)) {
+				// get_state / get_task / export_map / toolbox 为纯查询工具，不冲抵记账计数
+				return;
+			}
+			if (event.toolName.startsWith("mcp__pentrack__")) {
+				noteLedger(); // 镜像已在 tool_call 落节点=入账
+				return;
+			}
+			const text =
+				event.content
+					.map((c) => (c.type === "text" ? c.text : ""))
+					.join("\n") + (event.isError ? " (error)" : "");
+			const { timeout } = noteResult(event.isError, text);
+			// R7：被熔断命令标注「结果未知≠失败」（YJ outcome_unknown 语义）
+			if (timeout) {
+				(event.content as Array<{ type: string; text?: string }>).push({
+					type: "text",
+					text: "【PiX】命令超时被熔断：结果未知≠失败——先核实副作用（是否已打到目标/是否留下进程/文件），未核实前禁止原样重发同一命令。",
+				});
+			}
+
+			// 超图底层自动感知与水合引擎（Auto-Hydration Sniffer，不依赖模型自觉）
+			if (event.toolName === "bash" || event.toolName === "powershell") {
+				const cmd = String((event.input as { command?: unknown } | undefined)?.command ?? "");
+				const { sniffAndHydrate } = await import("./sniffer.ts");
+				const summary = sniffAndHydrate(cmd, text);
+				if (
+					summary.hosts > 0 ||
+					summary.credentials > 0 ||
+					summary.endpoints > 0 ||
+					summary.compromisedHosts > 0
+				) {
+					noteLedger(); // 自动入账成功，冲抵记账计数器
+					persist(pi); // 立即持久化超图
+					const notes: string[] = [];
+					if (summary.hosts > 0) notes.push(`主机 ${summary.hosts} 台 (开放服务 ${summary.services} 个)`);
+					if (summary.credentials > 0) notes.push(`凭据 ${summary.credentials} 项`);
+					if (summary.endpoints > 0) notes.push(`接口端点 ${summary.endpoints} 个`);
+					if (summary.compromisedHosts > 0) notes.push(`⚡ PWNED 主机 ${summary.compromisedHosts} 台`);
+					(event.content as Array<{ type: string; text?: string }>).push({
+						type: "text",
+						text: `【PiX 超图机制自动水合】底层已自动提取并入账超图：${notes.join("、")}。`,
+					});
+				}
+			}
+		});
 
 	// -----------------------------------------------------------------------
 	// 命令
@@ -462,31 +499,31 @@ export default function (pi: ExtensionAPI) {
 			// 渲染全部工具卡（复用 toolbox.ts 的卡片渲染——此处独立实现轻量版，避免引内部函数）
 			const { renderAllCards } = await import("./toolbox.ts");
 			writeFileSync(file, renderAllCards(), "utf8");
-			ctx.ui.notify(`工具卡手册已导出：${file}（${registry.length} 个工具）`, "info");
-		},
-	});
+				ctx.ui.notify(`工具卡手册已导出：${file}（${registry.length} 个工具）`, "info");
+			},
+		});
 
-	pi.registerCommand("report", {
-		description: "生成本次渗透报告（快照→渲染→pix-report-<时间戳>.md，含攻击链 Mermaid 配图）",
-		handler: async (_args, ctx) => {
-			try {
-				const { writeReport } = await import("./report.ts");
-				const file = await writeReport();
-				const state = getState();
-				const findings = state.nodes.filter((n) => n.type === "finding").length;
-				ctx.ui.notify(
-					`报告已生成：${file}\n（发现 ${findings} 项 · 图谱 ${state.nodes.length} 节点 ${state.edges.length} 边已快照冻结）`,
-					"info",
-				);
-			} catch (err) {
-				ctx.ui.notify(`报告生成失败：${err instanceof Error ? err.message : String(err)}`, "error");
-			}
-		},
-	});
+		pi.registerCommand("facts", {
+			description: "导出客观事实底表（用法: /facts 导出纯数据 Markdown 底表；/facts json 导出高保真结构化 JSON）",
+			handler: async (args, ctx) => {
+				const isJson = args.trim().toLowerCase() === "json";
+				const { exportGroundTruthJson, exportGroundTruthMarkdown } = await import("./exporter.ts");
+				if (isJson) {
+					const res = exportGroundTruthJson();
+					ctx.ui.notify(
+						`结构化事实底表已导出：${res.file}（已锁定 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点）`,
+						"info",
+					);
+				} else {
+					const res = exportGroundTruthMarkdown();
+					ctx.ui.notify(`客观事实底表已导出：${res.file}（零主观废话，纯数据与原始请求响应包）`, "info");
+				}
+			},
+		});
 
-	// -----------------------------------------------------------------------
-	// 工具
-	// -----------------------------------------------------------------------
+		// -----------------------------------------------------------------------
+		// 工具
+		// -----------------------------------------------------------------------
 
 	// --- 工具 1：record_fact（图谱核心） ---
 	pi.registerTool({
@@ -513,12 +550,16 @@ export default function (pi: ExtensionAPI) {
 						"补充：证据/失败原因/证伪条件。否定或失败结论必须附证据；手段未穷尽时记 hypothesis 而非 failure（证伪走 update_node rejected，不算失败）",
 				}),
 			),
-			confidence: Type.Optional(
-				Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")], {
-					description: "置信度（可选）：high=多源证实 / medium=单源实证 / low=单源弱信号",
-				}),
-			),
-			relatedTo: Type.Optional(Type.String({ description: "已有节点 id，如 H1（relation 需成对提供）" })),
+				confidence: Type.Optional(
+					Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")], {
+						description: "置信度（可选）：high=多源证实 / medium=单源实证 / low=单源弱信号",
+					}),
+				),
+				evidenceRequest: Type.Optional(Type.String({ description: "可复现的完整原始 HTTP 请求包（实例证明）" })),
+				evidenceResponse: Type.Optional(Type.String({ description: "对应的关键 HTTP 响应包或关键差分切片" })),
+				affectedCount: Type.Optional(Type.Integer({ description: "受影响数据总量计数（如 COUNT(*)）" })),
+				sampleProof: Type.Optional(Type.String({ description: "脱敏后的最小真实数据样本（3~5行）" })),
+				relatedTo: Type.Optional(Type.String({ description: "已有节点 id，如 H1（relation 需成对提供）" })),
 			relation: Type.Optional(
 				Type.Union(
 					[
@@ -532,7 +573,7 @@ export default function (pi: ExtensionAPI) {
 				),
 			),
 		}),
-		async execute(_toolCallId, params) {
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
 			const state = getState();
 			const node: Node = {
 				id: nextId(params.type as NodeType),
@@ -540,10 +581,14 @@ export default function (pi: ExtensionAPI) {
 				label: params.label,
 				createdAt: new Date().toISOString(),
 			};
-			if (params.tags && params.tags.length > 0) node.tags = params.tags;
-			if (params.detail) node.detail = params.detail;
-			if (params.confidence) node.confidence = params.confidence;
-			state.nodes.push(node);
+				if (params.tags && params.tags.length > 0) node.tags = params.tags;
+				if (params.detail) node.detail = params.detail;
+				if (params.confidence) node.confidence = params.confidence;
+				if (params.evidenceRequest) node.evidenceRequest = params.evidenceRequest;
+				if (params.evidenceResponse) node.evidenceResponse = params.evidenceResponse;
+				if (params.affectedCount !== undefined) node.affectedCount = params.affectedCount;
+				if (params.sampleProof) node.sampleProof = params.sampleProof;
+				state.nodes.push(node);
 
 			let edgeNote = "";
 			if (params.relatedTo) {
@@ -582,7 +627,7 @@ export default function (pi: ExtensionAPI) {
 			evidence: Type.String({ description: "确认证据" }),
 			tags: Type.Optional(Type.Array(Type.String(), { description: '标签，如 ["mysql","布尔盲注"]' })),
 		}),
-		async execute(_toolCallId, params) {
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
 			const state = getState();
 			let id = params.capability_id;
 			if (state.nodes.some((n) => n.id === id)) id = nextId("capability");
@@ -613,7 +658,7 @@ export default function (pi: ExtensionAPI) {
 			direction: Type.String({ description: '攻击方向，如 "id 参数报错型注入"' }),
 			reason: Type.String({ description: "失败原因" }),
 		}),
-		async execute(_toolCallId, params) {
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
 			const state = getState();
 			const count = bumpFailure(params.direction);
 			pushResult(false);
@@ -662,6 +707,11 @@ export default function (pi: ExtensionAPI) {
 					},
 					nodes: state.nodes,
 					edges: state.edges,
+					hypergraph: {
+						hosts: getAllHosts(),
+						sessions: getAllSessions(),
+						credentials: getAllCredentials(),
+					},
 					failureCounts: state.failureCounts,
 					auth: state.auth ? { targets: state.auth.targets, source: state.auth.source } : null,
 					task: state.task ? { title: state.task.title, recordedAt: state.task.recordedAt } : null,
@@ -706,7 +756,7 @@ export default function (pi: ExtensionAPI) {
 			const text = toMermaid();
 			return {
 				content: [{ type: "text", text: "```mermaid\n" + text + "\n```\n\n源码：\n```\n" + text + "\n```" }],
-				details: {},
+					details: {},
 			};
 		},
 	});
@@ -738,9 +788,9 @@ export default function (pi: ExtensionAPI) {
 			const effect =
 				node.type === "hypothesis" && params.status === "confirmed"
 					? "（假设证实，已计入节奏成功窗口）"
-					: node.type === "finding" && params.status === "confirmed"
-						? "（发现坐实，进入 /report 漏洞清单）"
-						: "";
+						: node.type === "finding" && params.status === "confirmed"
+							? "（发现坐实，已入账事实超图）"
+							: "";
 			return {
 				content: [
 					{ type: "text", text: `节点 ${node.id}（${node.type}）状态已更新为 ${params.status}${effect}` },
@@ -750,7 +800,316 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	// --- 工具 8：toolbox（工具注册表网关，M2） ---
-	registerToolboxTool(pi);
 
-}
+	// --- 工具 9：record_host（四维超图 · 主机与服务资产） ---
+	pi.registerTool({
+		name: "record_host",
+		label: "记录攻防主机资产",
+		description: "向四维超图登记主机资产信息（外网暴露资产/双网卡DMZ/内网资产；IP、系统、所属域、是否域控、是否已攻破提权、突破途径、开放端口服务列表）。自动映射到画板拓扑。",
+		parameters: Type.Object({
+			ips: Type.Array(Type.String(), { description: "主机 IP 列表（含多网卡）" }),
+			hostname: Type.Optional(Type.String({ description: "主机名（NetBIOS/FQDN）" })),
+			os: Type.Optional(Type.String({ description: "操作系统及版本，如 Windows Server 2019 / Linux" })),
+			domain: Type.Optional(Type.String({ description: "所属 Windows 域，如 corp.local" })),
+			networkScope: Type.Optional(
+				Type.Union([Type.Literal("external"), Type.Literal("dmz"), Type.Literal("internal")], {
+					description: "网络区域：external=外网边界 / dmz=双网卡隔离区 / internal=内网核心",
+				}),
+			),
+			isDC: Type.Optional(Type.Boolean({ description: "是否为域控制器 (Domain Controller)" })),
+			isCompromised: Type.Optional(Type.Boolean({ description: "是否已获取执行权限/立足点 (PWNED)" })),
+			compromiseVector: Type.Optional(
+				Type.String({ description: "边界突破途径/利用漏洞：如 'Shiro反序列化', '文件上传WebShell', '未授权RCE'" }),
+			),
+			services: Type.Optional(
+				Type.Array(
+					Type.Object({
+						port: Type.Integer({ description: "端口号" }),
+						protocol: Type.String({ description: "协议/服务名，如 smb, http, rdp, kerberos, ldap" }),
+						banner: Type.Optional(Type.String({ description: "指纹/Banner 摘要" })),
+					}),
+					{ description: "开放服务列表" },
+				),
+			),
+		}),
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+			const host = recordHost(params as any);
+			persist(pi);
+			const scopeDesc = host.networkScope === "external" ? "外网边界" : host.networkScope === "dmz" ? "DMZ跳板" : "内网核心";
+			return {
+				content: [
+					{
+						type: "text",
+						text: `已入账主机：${host.id} [${host.ips.join("/")}]（区域=${scopeDesc}）${host.isDC ? " (DC)" : ""}${host.isCompromised ? " (⚡PWNED)" : ""}，开放服务 ${host.services.length} 个`,
+					},
+				],
+				details: { hostId: host.id },
+			};
+		},
+	});
+
+	// --- 工具 10：record_pivot（四维超图 · 隧道与跳板路由） ---
+	pi.registerTool({
+		name: "record_pivot",
+		label: "登记内网跳板与隧道",
+		description: "登记打通的内网隧道/跳板（如 Chisel/FRP/Socks5/SSH 动态代理）。登记后，向对应内网网段发送的命令将自动获知并透明走代理通道。",
+		parameters: Type.Object({
+			sourceHostId: Type.String({ description: "驻留的受控主机 ID（如 host_10_10_1_20）" }),
+			tunnelType: Type.Union(
+				[
+					Type.Literal("socks5"),
+					Type.Literal("ssh_tun"),
+					Type.Literal("frp"),
+					Type.Literal("cmd_pipe"),
+					Type.Literal("webshell"),
+				],
+				{ description: "隧道类型" },
+			),
+			localListenPort: Type.Integer({ description: "本机监听的代理端口，如 10808" }),
+			egressSubnets: Type.Array(Type.String(), { description: "可路由达到的内网网段，如 [\'10.10.1.0/24\', \'172.16.0.0/16\']" }),
+			status: Type.Optional(Type.Union([Type.Literal("active"), Type.Literal("dead")], { description: "跳板状态" })),
+		}),
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+			const sess = recordPivotSession(params as any);
+			persist(pi);
+			return {
+				content: [
+					{
+						type: "text",
+						text: `已建立内网跳板：${sess.id}（类型=${sess.tunnelType}，本地端口=${sess.localListenPort}，可达网段=${sess.egressSubnets.join(", ")}）`,
+					},
+				],
+				details: { sessionId: sess.id },
+			};
+		},
+	});
+
+	// --- 工具 11：record_cred（四维超图 · 凭据金库与权限） ---
+	pi.registerTool({
+		name: "record_cred",
+		label: "登记已收割凭据",
+		description: "向凭据金库登记提取到的密码、NTLM Hash、Kerberos 票据或 SSH 私钥。用于横向移动矩阵与凭据喷洒。",
+		parameters: Type.Object({
+			account: Type.String({ description: "账号/用户名" }),
+			domain: Type.Optional(Type.String({ description: "域名或本地主机名" })),
+			type: Type.Union(
+				[
+					Type.Literal("plaintext"),
+					Type.Literal("ntlm_hash"),
+					Type.Literal("kerberos_ticket"),
+					Type.Literal("ssh_key"),
+					Type.Literal("api_key"),
+				],
+				{ description: "凭据类型" },
+			),
+			value: Type.String({ description: "密码明文、Hash 或票据内容" }),
+			originHostId: Type.String({ description: "从哪台主机收割到的凭据 ID" }),
+			privilegeScope: Type.Optional(
+				Type.Union(
+					[
+						Type.Literal("local_admin"),
+						Type.Literal("domain_admin"),
+						Type.Literal("domain_user"),
+						Type.Literal("guest"),
+					],
+					{ description: "权限等级" },
+				),
+			),
+			validTargets: Type.Optional(Type.Array(Type.String(), { description: "已验证可登录的主机 ID 列表" })),
+		}),
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+			const cred = recordCredential(params as any);
+			persist(pi);
+			return {
+				content: [
+					{
+						type: "text",
+						text: `凭据已入库：${cred.id} [${cred.type}] ${cred.domain ? cred.domain + "\\" : ""}${cred.account} (${cred.privilegeScope})`,
+					},
+				],
+				details: { credId: cred.id },
+			};
+		},
+	});
+
+		// --- 工具 12：consult_tactics（动态装载实战战术库与规约） ---
+		pi.registerTool({
+			name: "consult_tactics",
+			label: "查阅红队战术与规约",
+			description: "按需即时查阅内网横向、AD域控、隧道穿透、测绘管线等实战 SOP 规约与绕过字典。绝不膨胀全局上下文。",
+		parameters: Type.Object({
+			query: Type.String({
+				description: "战术关键词，如: 'kerberos', 'pth', 'adcs', 'lateral', 'tunnel', 'waf', 'subdomain', 'privesc', 'ledger'",
+			}),
+		}),
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+			const matches = searchTactics(params.query, 3);
+			if (matches.length === 0) {
+				return {
+					content: [{ type: "text", text: `未找到与 '${params.query}' 相关的战术专题。可尝试关键词: kerberos, lateral, tunnel, adcs, ntlm, privesc, recon.` }],
+					details: { count: 0 },
+				};
+			}
+			const sections = matches.map((m) => {
+				const sop = readTacticalSOP(m, 2000);
+				return `### 【${m.theater.toUpperCase()}】${m.title}\n*来源：${m.filePath}*\n\n${sop}`;
+			});
+			return {
+				content: [{ type: "text", text: `已动态加载 ${matches.length} 个相关战术专题：\n\n${sections.join("\n\n---\n\n")}` }],
+				details: { count: matches.length },
+			};
+		},
+	});
+
+	// --- 工具 13：pivot_exec（跳板代理感知包装器） ---
+	pi.registerTool({
+		name: "pivot_exec",
+		label: "生成跳板代理路由命令",
+		description: "自动检查目标 IP 是否位于内网，若是且已建跳板，自动将其包装为 proxychains 代理链执行命令。",
+		parameters: Type.Object({
+			command: Type.String({ description: "待执行的原命令，例如: 'nxc smb 10.10.1.20 -u admin -p pass'" }),
+			targetIp: Type.Optional(Type.String({ description: "目标 IP 地址（若不提供则自动从 command 中解析）" })),
+		}),
+		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const res = wrapCommandWithPivot(params.command, params.targetIp);
+				if (res.viaPivot) {
+					const methodDesc = res.strategy === "native" ? "原生注入 --proxy 代理参数" : "proxychains 代理链包裹";
+					return {
+						content: [
+							{
+								type: "text",
+								text: `已路由至跳板 ${res.viaPivot.id}（本地端口 ${res.viaPivot.localListenPort}，模式=${methodDesc}）。请在 bash 中执行以下命令：\n\`\`\`bash\n${res.command}\n\`\`\``,
+							},
+						],
+						details: { routed: true, viaPivot: res.viaPivot.id, command: res.command, strategy: res.strategy },
+					};
+				}
+			return {
+				content: [
+					{
+						type: "text",
+						text: `未发现适用的内网跳板路由（目标非内网或尚未建立对应网段隧道）。原生执行命令：\n\`\`\`bash\n${res.command}\n\`\`\``,
+					},
+				],
+				details: { routed: false, command: res.command },
+			};
+		},
+	});
+
+		// --- 工具 8：toolbox（工具注册表网关，M2） ---
+		registerToolboxTool(pi);
+
+		// --- 工具 14：record_endpoint（Web/API 接口资产台账登记） ---
+		pi.registerTool({
+			name: "record_endpoint",
+			label: "登记接口资产台账",
+			description:
+				"向接口台账登记发现的 Web/API 端点（URL、方法、参数、来源）。自动录入状态机，确保接口 100% 逐条闭环测试，杜绝抽样遗漏。",
+			parameters: Type.Object({
+				url: Type.String({ description: "完整接口 URL 或相对路径，例如 'https://target.com/api/v1/user'" }),
+				method: Type.Optional(
+					Type.Union(
+						[
+							Type.Literal("GET"),
+							Type.Literal("POST"),
+							Type.Literal("PUT"),
+							Type.Literal("DELETE"),
+							Type.Literal("PATCH"),
+							Type.Literal("HEAD"),
+							Type.Literal("OPTIONS"),
+						],
+						{ description: "HTTP 请求方法，默认 GET" },
+					),
+				),
+				params: Type.Optional(Type.Array(Type.String(), { description: "提取到的参数名列表，如 ['id', 'token']" })),
+				authRequired: Type.Optional(Type.Boolean({ description: "是否需要登录鉴权" })),
+				discoveredFrom: Type.Optional(Type.String({ description: "提取来源工具或途径（如 'rotor-goddess', 'katana', 'JS逆向'）" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const ep = recordEndpoint(params as any);
+				persist(pi);
+				return {
+					content: [
+						{
+							type: "text",
+							text: `接口已入账台账：${ep.id} [${ep.method}] ${ep.url}（状态=${ep.status}，参数=${(ep.params || []).join(", ") || "无"}）`,
+						},
+					],
+					details: { endpointId: ep.id },
+				};
+			},
+		});
+
+		// --- 工具 15：update_endpoint（接口状态机流转） ---
+		pi.registerTool({
+			name: "update_endpoint",
+			label: "流转接口测试状态",
+			description:
+				"推进接口台账的测试状态机：probing(探针测试中) -> bypassing(遭遇阻碍变异绕过中) -> confirmed(证实有漏洞)/rejected(已穷尽排除)。",
+			parameters: Type.Object({
+				idOrUrl: Type.String({ description: "接口 ID（如 ep_1）或完整 URL" }),
+				status: Type.Union(
+					[
+						Type.Literal("probing"),
+						Type.Literal("bypassing"),
+						Type.Literal("confirmed"),
+						Type.Literal("rejected"),
+					],
+					{ description: "流转目标状态" },
+				),
+				vulnerability: Type.Optional(Type.String({ description: "若证实存在漏洞，记录关联漏洞名称/类型" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const ep = updateEndpointStatus(params.idOrUrl, params.status as EndpointStatus, params.vulnerability);
+				if (!ep) {
+					return {
+						content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
+						details: {},
+					};
+				}
+				persist(pi);
+				return {
+					content: [
+						{
+							type: "text",
+							text: `接口 ${ep.id} 状态已流转为 [${ep.status}]（已测 ${ep.testedTimes} 次）${params.vulnerability ? ` 漏洞: ${params.vulnerability}` : ""}`,
+						},
+					],
+					details: { endpointId: ep.id, status: ep.status },
+				};
+			},
+		});
+
+		// --- 工具 16：export_facts（一键导出结构化事实底表） ---
+		pi.registerTool({
+			name: "export_facts",
+			label: "导出客观事实底表",
+			description:
+				"一键冻结并导出超图全量客观事实底表（支持 format='json' 导出机器可读高保真数据，或 format='md' 导出表格化事实）。供填入任何报告模板。",
+			parameters: Type.Object({
+				format: Type.Optional(Type.Union([Type.Literal("json"), Type.Literal("md")], { description: "导出格式，默认 json" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const isMd = params.format === "md";
+				const { exportGroundTruthJson, exportGroundTruthMarkdown } = await import("./exporter.ts");
+				if (isMd) {
+					const res = exportGroundTruthMarkdown();
+					return {
+						content: [{ type: "text", text: `客观事实底表已导出至：\n${res.file}\n\n预览片段：\n${res.text.slice(0, 500)}...` }],
+						details: { file: res.file },
+					};
+				}
+				const res = exportGroundTruthJson();
+				return {
+					content: [
+						{
+							type: "text",
+							text: `结构化事实快照（JSON）已导出至：\n${res.file}\n（包含 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点），可供任意自定义模板水合填充。`,
+						},
+					],
+					details: { file: res.file, statistics: res.data.statistics },
+				};
+			},
+		});
+
+	}

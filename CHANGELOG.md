@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.8.0（2026-10-13）— 跑批调度重建 + 知识连续性 + 能力补强（改良 v1.1）
+## 2.0.0（2026-11-02）— PiX-RedTeam: 4D 内网超图 · Sapper 军团架构 · 纯 CLI 武器库融合
+
+基于第一性原理对 PiX-Agent 进行全方位重构，彻底突破 Web 渗透局限，赋予其打穿企业内网与 Active Directory 域环境的完整红队作战能力：
+
+- **4D 内网超图引擎 (`state.ts`)**：
+  - 新增主机资产 (`HostNode`: 多网卡/系统/所属域/DC角色/PWNED控制状态/开放端口增量合并)
+  - 新增跳板路由 (`PivotSessionNode`: Socks5/FRP/SSH/TUN 隧道与内网可达网段映射)
+  - 新增凭据金库 (`CredentialNode`: NTLM Hash/Kerberos/明文/权限范围/已打通目标列表)
+  - 自动映射画板拓扑，支持原子防撕裂快照与跨会话知识继承
+- **跳板感知透明路由运行时 (`pivot-router.ts`)**：
+  - 针对内网目标的命令自动识别路由并注入 `proxychains.conf` 代理链包裹执行，实现零感知透传
+- **JIT 即时战术装载器 (`tactical-loader.ts`)**：
+  - 支持按需索引外部攻防武器库与资产测绘管线，内置 ADCS/PTH/Kerberos/提权/绕过同义词路由，按需动态检索提取核心 SOP，杜绝 Prompt 上下文爆炸
+- **纯 CLI 武器库重构 (`tools/` & `toolbox-data.ts`)**：
+  - 剔除 `suid-scan`, `aws-cli`, `az-cli`, `gcloud-ro`, `trivy`, `naabu` 等 6 款鸡肋与冗余工具
+  - 引入 5 大红队王牌：**转子女神 (rg_cli.py 纯CLI无头包装)**、**Certipy (ADCS域提权)**、**BloodHound (域拓扑采集)**、**pypykatz (内存密码提取)**、**ligolo-ng (极速TUN穿透)**
+  - 38 款武器 100% 具备纯 CLI AI 直接调用能力，物理文件就绪率 100%
+- **门禁看门狗与条令净化 (`gate.ts` & `rules.ts`)**：
+  - 彻底拔除强制 `howto` 读卡硬门禁与 65% 死代码，释放智能体行动自由度；保留 600s 确定性看门狗超时防挂死
+  - 提示词条令全面升级为 4D 超图拓扑驱动的内网作战兵法
+- **红队全景交付报告管线 (`report.ts`)**：
+  - 一键输出《内网存活与受控主机全景表》、《内网跳板与隧道穿透拓扑》、《脱敏凭据金库与权限流转表》与漏洞攻击链配图
+- **TypeScript 严格模式**：全量 TS 模块类型检查 `0` 错误，并通过端到端自动化验收驱动测试。
 
 三轮会话核查（33 失败题逐会话分类）+ 三方审查后实施的全量改良，验收 32/32 · tsc strict 0 error。
 

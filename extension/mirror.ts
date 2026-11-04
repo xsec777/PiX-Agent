@@ -30,11 +30,17 @@ const EDGE_MAP: Record<string, Relation> = {
 /** pentrack node_key/fact_key → 画板节点 id（边映射用；goal 记为特殊值） */
 const keyToNode = new Map<string, string>();
 const GOAL_SENTINEL = "__goal__";
-/** 本会话经由 pentrack 落库产生的画板节点（/report 落库核对用） */
+/** 本会话经由 pentrack 落库产生的画板节点（客观事实追踪） */
 const ledgerNodes = new Set<string>();
 
 export function mirroredNodeIds(): Set<string> {
 	return ledgerNodes;
+}
+
+/** 会话切换或重置时清空镜像映射 */
+export function resetMirror(): void {
+	keyToNode.clear();
+	ledgerNodes.clear();
 }
 
 function commit(pi: ExtensionAPI, node: Node): void {
