@@ -68,8 +68,6 @@ function resolveWorkDir() {
   if (process.env.PIX_WORKSPACE && require("fs").existsSync(process.env.PIX_WORKSPACE)) {
     return process.env.PIX_WORKSPACE;
   }
-  const fallback = "E:\\AProjs\\Pi\\Demo";
-  if (require("fs").existsSync(fallback)) return fallback;
   return PROJECT_DIR;
 }
 

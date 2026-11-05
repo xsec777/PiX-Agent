@@ -48,7 +48,7 @@ echo    3. 或者直接关闭当前黑框窗口。
 echo ========================================================
 echo.
 
-if exist "E:\AProjs\Pi\Demo" cd /d "E:\AProjs\Pi\Demo"
+if defined PIX_WORKSPACE if exist "%PIX_WORKSPACE%" cd /d "%PIX_WORKSPACE%"
 call pi-web --no-open
 
 echo.
