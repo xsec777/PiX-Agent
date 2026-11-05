@@ -183,8 +183,20 @@ export function exportGroundTruthMarkdown(): { file: string; text: string } {
 		L.push("| 编号 | HTTP 方法 | URL 端点 | 状态机流转 | 参数列表 | 关联脆弱点 |");
 		L.push("|---|---|---|---|---|---|");
 		for (const ep of data.endpoints) {
-			const stateTag =
-				ep.status === "confirmed" ? "✓ 已坐实" : ep.status === "rejected" ? "✗ 已排除" : ep.status === "bypassing" ? "🔄 绕过中" : "⏳ 待探针";
+				const stateTag =
+					ep.status === "confirmed"
+						? "🔴 已坐实"
+						: ep.status === "rejected"
+							? "🟢 已排除"
+							: ep.status === "bypassing"
+								? "🟣 变异绕过中"
+								: ep.status === "escalating"
+									? "⚡ 纵深利用中"
+									: ep.status === "probing"
+										? "🟡 探针测试中"
+										: ep.status === "blocked"
+											? "⛔ 不可抗力阻断"
+											: "⚪ 待测";
 			L.push(`| \`${ep.id}\` | \`${ep.method}\` | \`${ep.url}\` | ${stateTag} | ${(ep.params || []).join(", ") || "-"} | ${(ep.vulnerabilities || []).join("、") || "-"} |`);
 		}
 		L.push("");

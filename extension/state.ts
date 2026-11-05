@@ -112,10 +112,27 @@ export interface CredentialNode {
 
 // ---------------------------------------------------------------------------
 // 端点接口资产台账模型 (Endpoint Ledger: Web/API 资产闭环与状态机)
-// 状态流转：discovered(发现) -> probing(探针测试) -> bypassing(变异绕过) -> confirmed(坐实)/rejected(排除)
+// 七态流转：discovered -> probing -> bypassing -> escalating -> confirmed / rejected / blocked
 // ---------------------------------------------------------------------------
 
-export type EndpointStatus = "discovered" | "probing" | "bypassing" | "confirmed" | "rejected";
+export type EndpointStatus =
+	| "discovered"  // 已提取入账待测
+	| "probing"     // 探针特征探测中
+	| "bypassing"   // 遭遇阻断多维变异中
+	| "escalating"  // 突破边界纵深利用中
+	| "confirmed"   // 捕获最小实证坐实漏洞
+	| "rejected"    // L4充分证伪排除
+	| "blocked";    // 不可抗力/硬性失联留痕
+
+export interface TestRecord {
+	timestamp: string;
+	action: string;
+	status: EndpointStatus;
+	requestSnippet?: string;
+	responseSnippet?: string;
+	diffCharacteristic?: string;
+	escalationLevel?: number;
+}
 
 export interface EndpointNode {
 	id: string;
@@ -128,6 +145,12 @@ export interface EndpointNode {
 	discoveredFrom?: string;
 	testedTimes: number;
 	lastTestedAt?: string;
+	evidenceRequest?: string;      // 原始复现 HTTP 请求包 (Raw HTTP Request)
+	evidenceResponse?: string;     // 关键差分响应片段 (Response Snippet)
+	diffSignature?: string;        // 差分特征标识 (如 Status/Length/Keyword Diff)
+	failureStreak: number;         // 连续失败计数器
+	escalationLevel: number;       // 当前变异深度 (0-4)
+	testHistory: TestRecord[];     // 测试履历全生命周期追踪
 }
 
 /** 授权范围登记（/auth 写入） */
@@ -342,11 +365,18 @@ function asState(data: unknown): PixState | undefined {
 		edges: Array.isArray(d.edges) ? d.edges : [],
 		failureCounts: d.failureCounts && typeof d.failureCounts === "object" ? d.failureCounts : {},
 		sessionStartedAt: Date.now(), // 恢复后由 session_start 钩子重设计时
-			hosts: Array.isArray(d.hosts) ? d.hosts : [],
-			sessions: Array.isArray(d.sessions) ? d.sessions : [],
-			credentials: Array.isArray(d.credentials) ? d.credentials : [],
-			endpoints: Array.isArray(d.endpoints) ? d.endpoints : [],
-		};
+		hosts: Array.isArray(d.hosts) ? d.hosts : [],
+		sessions: Array.isArray(d.sessions) ? d.sessions : [],
+		credentials: Array.isArray(d.credentials) ? d.credentials : [],
+		endpoints: Array.isArray(d.endpoints)
+			? d.endpoints.map((e) => ({
+					...e,
+					failureStreak: typeof e.failureStreak === "number" ? e.failureStreak : 0,
+					escalationLevel: typeof e.escalationLevel === "number" ? e.escalationLevel : 0,
+					testHistory: Array.isArray(e.testHistory) ? e.testHistory : [],
+				}))
+			: [],
+	};
 		if (d.auth && Array.isArray(d.auth.targets)) restored.auth = d.auth;
 		if (d.task && typeof d.task.content === "string") restored.task = d.task;
 		return restored;
@@ -719,47 +749,151 @@ export function recordEndpoint(params: {
 		return existing;
 	}
 
-	const id = `ep_${state.endpoints.length + 1}`;
-	const node: EndpointNode = {
-		id,
-		url: cleanUrl,
-		method,
-		params: params.params,
-		authRequired: params.authRequired,
-		status: params.status || "discovered",
-		discoveredFrom: params.discoveredFrom,
-		testedTimes: 0,
-	};
-	state.endpoints.push(node);
-	return node;
-}
-
-export function updateEndpointStatus(
-	idOrUrl: string,
-	status: EndpointStatus,
-	vuln?: string,
-): EndpointNode | null {
-	state.endpoints ??= [];
-	const ep = state.endpoints.find((e) => e.id === idOrUrl || e.url === idOrUrl);
-	if (!ep) return null;
-	ep.status = status;
-	ep.testedTimes = (ep.testedTimes || 0) + 1;
-	ep.lastTestedAt = new Date().toISOString();
-	if (vuln) {
-		ep.vulnerabilities ??= [];
-		if (!ep.vulnerabilities.includes(vuln)) ep.vulnerabilities.push(vuln);
+		const id = `ep_${state.endpoints.length + 1}`;
+		const node: EndpointNode = {
+			id,
+			url: cleanUrl,
+			method,
+			params: params.params,
+			authRequired: params.authRequired,
+			status: params.status || "discovered",
+			discoveredFrom: params.discoveredFrom,
+			testedTimes: 0,
+			failureStreak: 0,
+			escalationLevel: 0,
+			testHistory: [],
+		};
+		state.endpoints.push(node);
+		return node;
 	}
-	return ep;
-}
 
-export function getAllEndpoints(): EndpointNode[] {
-	state.endpoints ??= [];
-	return state.endpoints;
-}
+	export interface UpdateEndpointOptions {
+		vuln?: string;
+		evidenceRequest?: string;
+		evidenceResponse?: string;
+		diffSignature?: string;
+		action?: string;
+		escalationLevel?: number;
+		detail?: string;
+	}
 
-export function getUnresolvedEndpoints(limit = 8): EndpointNode[] {
-	state.endpoints ??= [];
-	return state.endpoints
-		.filter((e) => e.status === "discovered" || e.status === "probing" || e.status === "bypassing")
-		.slice(0, limit);
-}
+	export function updateEndpointStatus(
+		idOrUrl: string,
+		status: EndpointStatus,
+		options?: string | UpdateEndpointOptions,
+	): EndpointNode | null {
+		state.endpoints ??= [];
+		const ep = state.endpoints.find((e) => e.id === idOrUrl || e.url === idOrUrl);
+		if (!ep) return null;
+
+		const opts: UpdateEndpointOptions = typeof options === "string" ? { vuln: options } : options || {};
+		ep.status = status;
+		ep.testedTimes = (ep.testedTimes || 0) + 1;
+		ep.lastTestedAt = new Date().toISOString();
+
+		if (opts.vuln) {
+			ep.vulnerabilities ??= [];
+			if (!ep.vulnerabilities.includes(opts.vuln)) ep.vulnerabilities.push(opts.vuln);
+		}
+		if (opts.evidenceRequest) ep.evidenceRequest = opts.evidenceRequest;
+		if (opts.evidenceResponse) ep.evidenceResponse = opts.evidenceResponse;
+		if (opts.diffSignature) ep.diffSignature = opts.diffSignature;
+
+		if (status === "confirmed") {
+			ep.failureStreak = 0;
+		} else if (status === "bypassing" || status === "probing") {
+			ep.failureStreak = (ep.failureStreak || 0) + 1;
+			if (opts.escalationLevel !== undefined) {
+				ep.escalationLevel = opts.escalationLevel;
+			} else if (status === "bypassing") {
+				ep.escalationLevel = Math.min(4, (ep.escalationLevel || 0) + 1);
+			}
+		}
+
+		ep.testHistory ??= [];
+		ep.testHistory.push({
+			timestamp: ep.lastTestedAt,
+			action: opts.action || `跃迁至 ${status}`,
+			status,
+			requestSnippet: opts.evidenceRequest ? opts.evidenceRequest.slice(0, 300) : undefined,
+			responseSnippet: opts.evidenceResponse ? opts.evidenceResponse.slice(0, 300) : undefined,
+			diffCharacteristic: opts.diffSignature || opts.vuln,
+			escalationLevel: ep.escalationLevel,
+		});
+
+		return ep;
+	}
+
+	export function isResolvedStatus(status: EndpointStatus): boolean {
+		return status === "confirmed" || status === "rejected" || status === "blocked";
+	}
+
+	export function getAllEndpoints(): EndpointNode[] {
+		state.endpoints ??= [];
+		return state.endpoints;
+	}
+
+	export function getUnresolvedEndpoints(limit = 8): EndpointNode[] {
+		state.endpoints ??= [];
+		return state.endpoints
+			.filter((e) => !isResolvedStatus(e.status))
+			.slice(0, limit);
+	}
+
+	const STATUS_PRIORITY: Record<EndpointStatus, number> = {
+		escalating: 1,
+		bypassing: 2,
+		probing: 3,
+		discovered: 4,
+		confirmed: 5,
+		rejected: 6,
+		blocked: 7,
+	};
+
+	export function getPendingEndpointsQueue(limit = 8): EndpointNode[] {
+		state.endpoints ??= [];
+		return state.endpoints
+			.filter((e) => !isResolvedStatus(e.status))
+			.sort((a, b) => (STATUS_PRIORITY[a.status] || 99) - (STATUS_PRIORITY[b.status] || 99))
+			.slice(0, limit);
+	}
+
+	export interface MatrixMetrics {
+		totalEndpoints: number;
+		closedEndpoints: number;
+		closedPercentage: number;
+		confirmedCount: number;
+		rejectedCount: number;
+		blockedCount: number;
+		escalatingCount: number;
+		bypassingCount: number;
+		probingCount: number;
+		discoveredCount: number;
+	}
+
+	export function getMatrixMetrics(): MatrixMetrics {
+		state.endpoints ??= [];
+		const total = state.endpoints.length;
+		const confirmed = state.endpoints.filter((e) => e.status === "confirmed").length;
+		const rejected = state.endpoints.filter((e) => e.status === "rejected").length;
+		const blocked = state.endpoints.filter((e) => e.status === "blocked").length;
+		const escalating = state.endpoints.filter((e) => e.status === "escalating").length;
+		const bypassing = state.endpoints.filter((e) => e.status === "bypassing").length;
+		const probing = state.endpoints.filter((e) => e.status === "probing").length;
+		const discovered = state.endpoints.filter((e) => e.status === "discovered").length;
+		const closed = confirmed + rejected + blocked;
+		const closedPercentage = total > 0 ? Number.parseFloat(((closed / total) * 100).toFixed(1)) : 0;
+
+		return {
+			totalEndpoints: total,
+			closedEndpoints: closed,
+			closedPercentage,
+			confirmedCount: confirmed,
+			rejectedCount: rejected,
+			blockedCount: blocked,
+			escalatingCount: escalating,
+			bypassingCount: bypassing,
+			probingCount: probing,
+			discoveredCount: discovered,
+		};
+	}

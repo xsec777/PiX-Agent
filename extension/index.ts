@@ -1042,42 +1042,53 @@ export default function (pi: ExtensionAPI) {
 
 		// --- 工具 15：update_endpoint（接口状态机流转） ---
 		pi.registerTool({
-			name: "update_endpoint",
-			label: "流转接口测试状态",
-			description:
-				"推进接口台账的测试状态机：probing(探针测试中) -> bypassing(遭遇阻碍变异绕过中) -> confirmed(证实有漏洞)/rejected(已穷尽排除)。",
-			parameters: Type.Object({
-				idOrUrl: Type.String({ description: "接口 ID（如 ep_1）或完整 URL" }),
-				status: Type.Union(
-					[
-						Type.Literal("probing"),
-						Type.Literal("bypassing"),
-						Type.Literal("confirmed"),
-						Type.Literal("rejected"),
-					],
-					{ description: "流转目标状态" },
-				),
-				vulnerability: Type.Optional(Type.String({ description: "若证实存在漏洞，记录关联漏洞名称/类型" })),
-			}),
-			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
-				const ep = updateEndpointStatus(params.idOrUrl, params.status as EndpointStatus, params.vulnerability);
-				if (!ep) {
+				name: "update_endpoint",
+				label: "流转接口测试状态",
+				description:
+					"推进接口台账的七态状态机：discovered -> probing(探针中) -> bypassing(变异绕过中) -> escalating(纵深利用中) -> confirmed(坐实漏洞)/rejected(L4充分证伪)/blocked(不可抗力留痕)。",
+				parameters: Type.Object({
+					idOrUrl: Type.String({ description: "接口 ID（如 ep_1）或完整 URL" }),
+					status: Type.Union(
+						[
+							Type.Literal("discovered"),
+							Type.Literal("probing"),
+							Type.Literal("bypassing"),
+							Type.Literal("escalating"),
+							Type.Literal("confirmed"),
+							Type.Literal("rejected"),
+							Type.Literal("blocked"),
+						],
+						{ description: "流转目标状态" },
+					),
+					vulnerability: Type.Optional(Type.String({ description: "若证实存在漏洞，记录关联漏洞名称/类型" })),
+					evidenceRequest: Type.Optional(Type.String({ description: "原始复现 HTTP 请求包 (Raw HTTP Request)" })),
+					evidenceResponse: Type.Optional(Type.String({ description: "关键响应差分证据切片 (Response Snippet)" })),
+					diffSignature: Type.Optional(Type.String({ description: "差分特征标识 (如状态码/回显特征/时延)" })),
+				}),
+				async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+					const ep = updateEndpointStatus(params.idOrUrl, params.status as EndpointStatus, {
+						vuln: params.vulnerability,
+						evidenceRequest: params.evidenceRequest,
+						evidenceResponse: params.evidenceResponse,
+						diffSignature: params.diffSignature,
+					});
+					if (!ep) {
+						return {
+							content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
+							details: {},
+						};
+					}
+					persist(pi);
 					return {
-						content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
-						details: {},
+						content: [
+							{
+								type: "text",
+								text: `接口 ${ep.id} 状态已流转为 [${ep.status}]（已测 ${ep.testedTimes} 次）${params.vulnerability ? ` 漏洞: ${params.vulnerability}` : ""}`,
+							},
+						],
+						details: { endpointId: ep.id, status: ep.status },
 					};
-				}
-				persist(pi);
-				return {
-					content: [
-						{
-							type: "text",
-							text: `接口 ${ep.id} 状态已流转为 [${ep.status}]（已测 ${ep.testedTimes} 次）${params.vulnerability ? ` 漏洞: ${params.vulnerability}` : ""}`,
-						},
-					],
-					details: { endpointId: ep.id, status: ep.status },
-				};
-			},
+				},
 		});
 
 		// --- 工具 16：export_facts（一键导出结构化事实底表） ---
