@@ -87,7 +87,6 @@ function resolvePython(): string {
 
 	// 历史常用盘符路径兜底探测
 	const commonPaths = [
-		"E:\\env\\python3106\\python.exe",
 		"C:\\Python310\\python.exe",
 		"C:\\Python311\\python.exe",
 	];
@@ -416,7 +415,7 @@ export const TOOLBOX: ToolCard[] = [
 		purpose: "内网协议验证（SMB/WinRM/LDAP/MSSQL 凭据喷洒与枚举，fscan 精细化）",
 		tested: true,
 		runtime: "direct",
-		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe") ? TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe" : "E:\\env\\python3146\\Scripts\\nxc.exe",
+		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe") ? TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe" : "nxc",
 		invocation: "<path> smb <目标> -u <用户> -p <密码> --shares",
 		hardRules: ["redt 模式须任务书覆盖；凭据喷洒单轮低频", "需 Python 3.11+（pip 装 git+https://github.com/Pennyw0rth/NetExec；PyPI 已无 netexec 包）"],
 	},
@@ -427,7 +426,7 @@ export const TOOLBOX: ToolCard[] = [
 		purpose: "AD/Windows 协议套件（secretsdump/psexec/wmiexec 等后渗透动作）",
 		tested: true,
 		runtime: "python",
-		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py") ? TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py" : "E:\\env\\python3106\\Scripts\\secretsdump.py",
+		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py") ? TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py" : "secretsdump.py",
 		invocation: "<runtime> <path> <域>/<用户>:<密码>@<目标> <域>/<用户>:<密码>@<目标>",
 		hardRules: ["redt 专属：任务书明示允许才用；动作全部留证", "示例脚本在 <runtime> 同级 Scripts/ 下"],
 	},

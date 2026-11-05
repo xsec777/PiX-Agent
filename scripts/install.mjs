@@ -33,7 +33,7 @@ const FILES = ["index.ts", "state.ts", "rules.ts", "pacing.ts", "guard.ts", "gat
 function writePixConfig() {
 	const cfg = {
 		toolsRoot: join(ROOT, "tools").replace(/\\/g, "\\\\"),
-		py310: process.env.PIX_PY310 ?? "E:\\env\\python3106\\python.exe",
+		py310: process.env.PIX_PY310 ?? "python3",
 	};
 	writeFileSync(join(EXT_DST, "pix-config.json"), JSON.stringify(cfg, null, 2), "utf8");
 	console.log(`✓ pix-config.json 已写入（toolsRoot=${cfg.toolsRoot}）`);
