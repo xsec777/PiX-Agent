@@ -220,41 +220,138 @@ export function sniffAndHydrate(command: string, output: string): SniffSummary {
 		summary.credentials += 1;
 	}
 
-	// -----------------------------------------------------------------------
-	// 3. 嗅探 Web/API 接口资产台账 (Endpoint Sniffer)
-	// -----------------------------------------------------------------------
-	const isUrlDiscoveryCmd = /katana|URLFinder|rg_cli|LinkFinder|waybackurls|dirsearch|ffuf/i.test(command);
-	if (isUrlDiscoveryCmd) {
-		const urlRe = /\bhttps?:\/\/[^\s"'<>\\]+/gi;
-		const staticExtRe = /\.(?:png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot|map)(?:\?.*)?$/i;
-		const foundUrls = new Set<string>();
+		// -----------------------------------------------------------------------
+		// 3. 嗅探 Web/API 接口资产台账 (Multi-Source Endpoint & Nuclei Sniffer)
+		// -----------------------------------------------------------------------
+		const staticExtRe = /\.(?:png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot|map|mp4|avi|mp3|pdf|doc|docx|xls|xlsx)(?:\?.*)?$/i;
+		const foundEndpoints = new Map<string, { method: "GET" | "POST" | "PUT" | "DELETE"; params?: string[]; vuln?: string; status?: "discovered" | "confirmed"; resp?: string }>();
 
-		while ((m = urlRe.exec(cleanOutput)) !== null) {
-			const url = m[0].trim();
-			if (!staticExtRe.test(url)) {
-				foundUrls.add(url);
-				if (foundUrls.size >= 30) break; // 单批次限制 30 条高价值端点
+		// 3.0 从命令行推导基准目标根 URL (Base URL)
+		let baseUrl: string | null = null;
+		const uMatch = command.match(/(?:-u|--url|-target|--target)\s+["']?(https?:\/\/[^\s"']+)["']?/i);
+		if (uMatch) {
+			try {
+				const p = new URL(uMatch[1]);
+				baseUrl = `${p.protocol}//${p.host}`;
+			} catch {}
+		}
+		if (!baseUrl) {
+			const directUrlMatch = command.match(/\bhttps?:\/\/[^\s"']+/i);
+			if (directUrlMatch) {
+				try {
+					const p = new URL(directUrlMatch[0]);
+					baseUrl = `${p.protocol}//${p.host}`;
+				} catch {}
 			}
 		}
 
-		for (const u of foundUrls) {
-			// 嗅探参数
+		const addDiscoveredEndpoint = (rawPathOrUrl: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", extra?: { vuln?: string; status?: "discovered" | "confirmed"; resp?: string }) => {
+			let fullUrl = rawPathOrUrl.trim();
+			if (!fullUrl || staticExtRe.test(fullUrl)) return;
+
+			if (!fullUrl.startsWith("http://") && !fullUrl.startsWith("https://")) {
+				if (fullUrl.startsWith("/")) {
+					if (!baseUrl) return;
+					fullUrl = `${baseUrl}${fullUrl}`;
+				} else if (baseUrl) {
+					fullUrl = `${baseUrl}/${fullUrl}`;
+				} else {
+					return;
+				}
+			}
+
+			// 解析查询参数
 			let params: string[] | undefined;
 			try {
-				const parsed = new URL(u);
-				const searchKeys = Array.from(parsed.searchParams.keys());
-				if (searchKeys.length > 0) params = searchKeys;
+				const p = new URL(fullUrl);
+				const keys = Array.from(p.searchParams.keys());
+				if (keys.length > 0) params = keys;
 			} catch {}
 
-			recordEndpoint({
-				url: u,
-				method: "GET",
-				params,
+			const key = `${method}:${fullUrl}`;
+			if (!foundEndpoints.has(key) && foundEndpoints.size < 40) {
+				foundEndpoints.set(key, {
+					method,
+					params,
+					vuln: extra?.vuln,
+					status: extra?.status,
+					resp: extra?.resp,
+				});
+			}
+		};
+
+			// 3.1 嗅探 Nuclei 漏洞命中: [vuln-id] [http] [severity] https://target/path
+			const nucleiRe = /\[([a-zA-Z0-9_.:-]+)\]\s+\[(?:http|https)\]\s+\[(info|low|medium|high|critical)\]\s+(https?:\/\/[^\s"'<>\\]+)/gi;
+		while ((m = nucleiRe.exec(cleanOutput)) !== null) {
+			const vulnId = m[1];
+			const severity = m[2].toLowerCase();
+			const targetUrl = m[3];
+			const isConfirmed = severity === "critical" || severity === "high" || severity === "medium";
+			addDiscoveredEndpoint(targetUrl, "GET", {
+				vuln: `Nuclei [${severity.toUpperCase()}]: ${vulnId}`,
+				status: isConfirmed ? "confirmed" : "discovered",
+				resp: `[Nuclei命中] 规则: ${vulnId} · 严重度: ${severity}`,
+			});
+		}
+
+		// 3.2 嗅探 Katana 爬虫输出: [GET/POST] https://target/path 或纯 URL 行
+		const katanaRe = /(?:\[(GET|POST|PUT|DELETE)\]\s+)?(https?:\/\/[^\s"'<>\\]+)/gi;
+		while ((m = katanaRe.exec(cleanOutput)) !== null) {
+			const method = (m[1]?.toUpperCase() as "GET" | "POST" | "PUT" | "DELETE") || "GET";
+			const u = m[2];
+			addDiscoveredEndpoint(u, method);
+		}
+
+		// 3.3 嗅探 Dirsearch 目录爆破输出: [12:34:56] 200 - 1KB - /admin/config.php
+		const dirsearchRe = /(?:\[\d{2}:\d{2}:\d{2}\]\s+)?(200|301|302|403)\s+-\s+[\d.]+[A-Za-zB]+\s+-\s+(\/[^\s"']+)/gi;
+		while ((m = dirsearchRe.exec(cleanOutput)) !== null) {
+			const path = m[2];
+			addDiscoveredEndpoint(path, "GET");
+		}
+
+		// 3.4 嗅探 Ffuf Fuzz 输出: "admin [Status: 200, Size: 1234]" 或 JSON {"url":"..."}
+		const ffufRe = /(?:^\s*|\n\s*)(\/[a-zA-Z0-9_./?=&%-]+|[a-zA-Z0-9_.-]+)\s+\[Status:\s*(200|301|302|403)/gi;
+		while ((m = ffufRe.exec(cleanOutput)) !== null) {
+			const raw = m[1].startsWith("/") ? m[1] : `/${m[1]}`;
+			addDiscoveredEndpoint(raw, "GET");
+		}
+
+		// 3.5 嗅探 LinkFinder / rg_cli / URLFinder 提取的引号路由: "/api/v1/auth/reset_password"
+		const quotedRouteRe = /["'](\/(?:api|v[0-9]|rest|admin|user|auth|service|upload|graphql|system)[a-zA-Z0-9_./?=&%-]*)["']/gi;
+		while ((m = quotedRouteRe.exec(cleanOutput)) !== null) {
+			const path = m[1];
+			addDiscoveredEndpoint(path, "GET");
+		}
+
+		// 3.6 兜底通用 URL 提取
+		const isUrlDiscoveryCmd = /katana|URLFinder|rg_cli|LinkFinder|waybackurls|dirsearch|ffuf|httpx/i.test(command);
+		if (isUrlDiscoveryCmd) {
+			const generalUrlRe = /\bhttps?:\/\/[^\s"'<>\\]+/gi;
+			while ((m = generalUrlRe.exec(cleanOutput)) !== null) {
+				addDiscoveredEndpoint(m[0], "GET");
+			}
+		}
+
+		// 执行端点入账水合
+		for (const [key, data] of foundEndpoints) {
+			const epUrl = key.slice(key.indexOf(":") + 1);
+			const node = recordEndpoint({
+				url: epUrl,
+				method: data.method,
+				params: data.params,
+				status: data.status || "discovered",
 				discoveredFrom: command.split(" ")[0] || "scanner",
 			});
+			if (data.vuln) {
+				node.vulnerabilities ??= [];
+				if (!node.vulnerabilities.includes(data.vuln)) node.vulnerabilities.push(data.vuln);
+				if (data.status === "confirmed") {
+					node.status = "confirmed";
+					node.evidenceResponse = data.resp;
+				}
+			}
 			summary.endpoints += 1;
 		}
-	}
 
-	return summary;
-}
+		return summary;
+	}
