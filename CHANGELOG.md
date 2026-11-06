@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.1.1（2026-11-06）— 多源工具输出流端点与参数特征自动水合感知器
+
+- **物理流正则感知管道升级 (Physical Stream Sniffer)**：多源渗透工具物理回显 100% 自动入账
+  - Dirsearch 目录爆破：精准提取 200/301/302/403 状态码与相对路径，自动结合命令推导 Base URL 完整拼接
+  - Ffuf Web Fuzz：自动提取 Fuzz 成功路径与对应 HTTP 状态码
+  - Katana 爬虫：支持动态捕获 `[GET]/[POST]/[PUT]/[DELETE]` 方法与绝对 URL
+  - LinkFinder / rg_cli / URLFinder：精准抽取 JS 动态路由与隐藏 API 接口（支持 `/api/v1/...` 等高价值前缀）
+  - Nuclei 漏洞扫描：自动匹配 `[vuln-id] [severity]`，识别 critical/high 并流转为 `confirmed` 坐实态，绑定规则指纹
+- **静态资源黑名单拦截**：自动剔除 `.png/.jpg/.css/.js/.woff2` 等无渗透价值噪音
+- **自动查询参数结构化提取**：解析 URL 查询字符串为 `params[]`，供后续 Fuzz 与状态机反哺调度直接消费
+
+## 2.1.0（2026-11-06）— 端点台账七态流转模型与关键证据链数据结构
+
+- **EndpointStatus 七态流转模型**：`discovered` → `probing` → `bypassing` → `escalating` → `confirmed` / `rejected` / `blocked`
+- **EndpointNode 完整因果证据链**：`evidenceRequest` / `evidenceResponse` / `diffSignature` / `failureStreak` / `escalationLevel` / `testHistory`
+- **状态管理函数增强**：`updateEndpointStatus` 兼容旧签名并支持实证对象高阶流转；`getPendingEndpointsQueue` 动态优先级队列；`getMatrixMetrics` 闭环率与漏斗聚合
+- **index.ts 与 exporter.ts 全面对接**：`update_endpoint` 支持证据链传参与七态标识导出
+
 ## 2.0.0（2026-11-02）— PiX-RedTeam: 4D 内网超图 · Sapper 军团架构 · 纯 CLI 武器库融合
 
 基于第一性原理对 PiX-Agent 进行全方位重构，彻底突破 Web 渗透局限，赋予其打穿企业内网与 Active Directory 域环境的完整红队作战能力：
