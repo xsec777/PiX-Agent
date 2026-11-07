@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0（2026-11-07）— 原子化实时测试进度镜像总线 (Live Matrix Bus)
+
+- 新增 `extension/live-matrix.ts`，建立状态机与外部观察者之间的实时数据镜像通道；
+- 引入 500ms 内存防抖定时器，避免高频侦察/扫描引发频繁磁盘 I/O；
+- 实现原子防撕裂快照双写：临时文件写入后原子重命名覆盖 `cwd/pix-live-matrix.json`；
+- 聚合输出全站闭环百分比、七态漏洞漏斗指标与当前探测焦点 `currentFocus`；
+- 打通 `record_host`、`record_endpoint`、`update_endpoint` 以及 sniffer 自动水合后的实时矩阵广播；
+- 版本号、README 徽标与发行元数据同步升级至 `2.2.0`。
+
 ## 2.1.1（2026-11-06）— 多源工具输出流端点与参数特征自动水合感知器
 
 - **物理流正则感知管道升级 (Physical Stream Sniffer)**：多源渗透工具物理回显 100% 自动入账

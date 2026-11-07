@@ -64,6 +64,7 @@ import { countExternalAction, noteLedger, noteResult, resetSensors } from "./sen
 import { mirrorPentrackCall, resetMirror } from "./mirror.ts";
 import { registerToolboxTool } from "./toolbox.ts";
 import { loadRegistry } from "./toolbox.ts";
+import { emitMatrixUpdate } from "./live-matrix.ts";
 
 /** Mermaid 导出：graph 视图（关系图；leads_to 加粗为攻击链主线） */
 function toMermaid(): string {
@@ -329,8 +330,9 @@ export default function (pi: ExtensionAPI) {
 					summary.endpoints > 0 ||
 					summary.compromisedHosts > 0
 				) {
-					noteLedger(); // 自动入账成功，冲抵记账计数器
-					persist(pi); // 立即持久化超图
+						noteLedger(); // 自动入账成功，冲抵记账计数器
+						persist(pi); // 立即持久化超图
+						emitMatrixUpdate("sniffer_autohydrate"); // 触发实时矩阵看板总线更新
 					const notes: string[] = [];
 					if (summary.hosts > 0) notes.push(`主机 ${summary.hosts} 台 (开放服务 ${summary.services} 个)`);
 					if (summary.credentials > 0) notes.push(`凭据 ${summary.credentials} 项`);
@@ -832,10 +834,11 @@ export default function (pi: ExtensionAPI) {
 				),
 			),
 		}),
-		async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
-			const host = recordHost(params as any);
-			persist(pi);
-			const scopeDesc = host.networkScope === "external" ? "外网边界" : host.networkScope === "dmz" ? "DMZ跳板" : "内网核心";
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const host = recordHost(params as any);
+				persist(pi);
+				emitMatrixUpdate("record_host");
+				const scopeDesc = host.networkScope === "external" ? "外网边界" : host.networkScope === "dmz" ? "DMZ跳板" : "内网核心";
 			return {
 				content: [
 					{
@@ -1025,19 +1028,20 @@ export default function (pi: ExtensionAPI) {
 				authRequired: Type.Optional(Type.Boolean({ description: "是否需要登录鉴权" })),
 				discoveredFrom: Type.Optional(Type.String({ description: "提取来源工具或途径（如 'rotor-goddess', 'katana', 'JS逆向'）" })),
 			}),
-			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
-				const ep = recordEndpoint(params as any);
-				persist(pi);
-				return {
-					content: [
-						{
-							type: "text",
-							text: `接口已入账台账：${ep.id} [${ep.method}] ${ep.url}（状态=${ep.status}，参数=${(ep.params || []).join(", ") || "无"}）`,
-						},
-					],
-					details: { endpointId: ep.id },
-				};
-			},
+				async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+					const ep = recordEndpoint(params as any);
+					persist(pi);
+					emitMatrixUpdate("record_endpoint");
+					return {
+						content: [
+							{
+								type: "text",
+								text: `接口已入账台账：${ep.id} [${ep.method}] ${ep.url}（状态=${ep.status}，参数=${(ep.params || []).join(", ") || "无"}）`,
+							},
+						],
+						details: { endpointId: ep.id },
+					};
+				},
 		});
 
 		// --- 工具 15：update_endpoint（接口状态机流转） ---
@@ -1072,22 +1076,23 @@ export default function (pi: ExtensionAPI) {
 						evidenceResponse: params.evidenceResponse,
 						diffSignature: params.diffSignature,
 					});
-					if (!ep) {
+						if (!ep) {
+							return {
+								content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
+								details: {},
+							};
+						}
+						persist(pi);
+						emitMatrixUpdate("update_endpoint");
 						return {
-							content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
-							details: {},
+							content: [
+								{
+									type: "text",
+									text: `接口 ${ep.id} 状态已流转为 [${ep.status}]（已测 ${ep.testedTimes} 次）${params.vulnerability ? ` 漏洞: ${params.vulnerability}` : ""}`,
+								},
+							],
+							details: { endpointId: ep.id, status: ep.status },
 						};
-					}
-					persist(pi);
-					return {
-						content: [
-							{
-								type: "text",
-								text: `接口 ${ep.id} 状态已流转为 [${ep.status}]（已测 ${ep.testedTimes} 次）${params.vulnerability ? ` 漏洞: ${params.vulnerability}` : ""}`,
-							},
-						],
-						details: { endpointId: ep.id, status: ep.status },
-					};
 				},
 		});
 

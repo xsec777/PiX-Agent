@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.1.1",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：七态端点台账 + 多源输出流自动水合感知 + 两模式条令 + 4D 超图",
+  "version": "2.2.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：七态端点台账 + 多源自动水合 + Live Matrix 原子实时镜像总线 + 4D 超图",
   "type": "module",
   "main": "index.ts",
   "private": true,
