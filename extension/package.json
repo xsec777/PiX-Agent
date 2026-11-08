@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.2.1",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：ANSI Live Matrix 终端看板 + 七态端点台账 + 战术 JIT 装载器 + 4D 超图",
+  "version": "2.3.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：实时台账反哺调度提示词 + ANSI Live Matrix + 七态端点闭环 + 4D 超图",
   "type": "module",
   "main": "index.ts",
   "private": true,

@@ -16,7 +16,8 @@ import {
 	historyLinesOf,
 	getAllHosts,
 	getAllSessions,
-	getUnresolvedEndpoints,
+	getPendingEndpointsQueue,
+	getMatrixMetrics,
 } from "./state.ts";
 import { failureRate } from "./pacing.ts";
 import { sensorReminders } from "./sensor.ts";
@@ -246,16 +247,22 @@ export function buildSection(): string {
 3. Windows：whoami /priv + 服务路径弱权限 → token 权限（Potato 系需任务书许可）→ 凭据检索
 4. 枚举工具直接调用 winpeas / linpeas CLI；每步环境事实 record_fact，不重复枚举
 5. 提权成功后立即回到任务目标（拿 flag/数据/域控），禁脱离目标空转`;
-	}
+		}
 
-		// 接口资产台账刚性待测清单（强迫模型 100% 逐条闭环测试，杜绝抽样偷懒）
-		const unresolvedEps = getUnresolvedEndpoints(6);
-		if (unresolvedEps.length > 0) {
-			const epList = unresolvedEps
-				.map((ep) => `- ${ep.id} [${ep.method}] ${ep.url}（状态=${ep.status}，已测=${ep.testedTimes}次）`)
-				.join("\n");
-			section += `\n\n【接口台账刚性闭环待测清单】以下接口尚未完成深度测试闭环，严禁抽样偷懒跳过：\n${epList}\n（测试时先探针，遇阻碍 update_endpoint status=bypassing 进行多维变形，彻底完成测试后 update_endpoint status=confirmed/rejected）`;
+		// 攻击面矩阵动态反哺与优先调度投影（实时闭环率 + 待测优先队列，强迫模型 100% 逐条闭环，严禁抽样偷懒）
+		const metrics = getMatrixMetrics();
+		if (metrics.totalEndpoints > 0) {
+			const queue = getPendingEndpointsQueue(4);
+			const queueLines = queue.map((ep, idx) => {
+				const paramStr = ep.params?.length ? ` (参数: ${ep.params.join(", ")})` : "";
+				const streakStr = ep.failureStreak > 0 ? ` [连续阻抗: ${ep.failureStreak}次]` : "";
+				return `  ${idx + 1}. [P0] ${ep.id} [${ep.method}] ${ep.url}${paramStr} 状态=${ep.status}${streakStr} 已测=${ep.testedTimes}次`;
+			});
+
+			section += `\n\n【攻击面台账进度与优先调度队列】
+全网端点: ${metrics.totalEndpoints} 个 | 闭环率: ${metrics.closedPercentage}% (${metrics.closedEndpoints}/${metrics.totalEndpoints}) | 坐实: ${metrics.confirmedCount} | 变异中: ${metrics.bypassingCount} | 探针中: ${metrics.probingCount}
+当前优先攻坚队列（严禁抽样跳过，优先攻坚变异中/未测端点）：\n${queueLines.join("\n") || "  ✓ 全部端点已 100% 闭环测试完毕。"}\n【刚性纪律】必须优先调度并闭环上述队列中的端点；发送探针或变异测试后，必须立即调用 update_endpoint 回写状态机（confirmed/rejected）！`;
 		}
 
 		return section;
-}
+	}
