@@ -516,10 +516,36 @@ export default function (pi: ExtensionAPI) {
 						`结构化事实底表已导出：${res.file}（已锁定 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点）`,
 						"info",
 					);
+					} else {
+						const res = exportGroundTruthMarkdown();
+						ctx.ui.notify(`客观事实底表已导出：${res.file}（零主观废话，纯数据与原始请求响应包）`, "info");
+					}
+				},
+			});
+
+		pi.registerCommand("matrix", {
+			description: "查看攻防接口闭环测试看板（用法: /matrix 查看全景矩阵看板；/matrix <ep_id> 查看单端点证据下钻）",
+			handler: async (args, ctx) => {
+				const arg = args.trim();
+				const { renderMatrixView, renderEndpointDetail } = await import("./matrix-view.ts");
+				if (arg) {
+					const text = renderEndpointDetail(arg);
+					console.log(text);
+					ctx.ui.notify(`已下钻端点详情：${arg}`, "info");
 				} else {
-					const res = exportGroundTruthMarkdown();
-					ctx.ui.notify(`客观事实底表已导出：${res.file}（零主观废话，纯数据与原始请求响应包）`, "info");
+					const text = renderMatrixView();
+					console.log(text);
+					ctx.ui.notify("已在终端输出攻击面闭环矩阵看板", "info");
 				}
+			},
+		});
+
+		pi.registerCommand("ledger", {
+			description: "查看攻击面接口闭环矩阵看板（/matrix 别名）",
+			handler: async (args, ctx) => {
+				const { renderMatrixView } = await import("./matrix-view.ts");
+				console.log(renderMatrixView());
+				ctx.ui.notify("已在终端输出攻击面闭环矩阵看板", "info");
 			},
 		});
 
