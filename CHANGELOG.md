@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1（2026-11-08）— /matrix 终端交互式接口闭环进度总览视图与证据下钻
+
+- 新增 `extension/matrix-view.ts`：ANSI 终端攻击面与接口闭环测试看板；
+- 支持 `/matrix` 与 `/ledger` 斜杠命令，动态渲染闭环率、七态彩色徽标与 Top 3 待测优先队列；
+- 新增 `/matrix <ep_id>` 单端点深度下钻，呈现完整 `testHistory`、原始请求包与响应差分证据；
+- 强化 `tactical-loader.ts` JIT 战术检索、结构感知切片与外部技能目录容错装载；
+- 版本号、README 徽标与发行元数据同步升级至 `2.2.1`。
+
 ## 2.2.0（2026-11-07）— 原子化实时测试进度镜像总线 (Live Matrix Bus)
 
 - 新增 `extension/live-matrix.ts`，建立状态机与外部观察者之间的实时数据镜像通道；
