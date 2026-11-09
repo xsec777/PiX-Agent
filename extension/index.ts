@@ -338,13 +338,20 @@ export default function (pi: ExtensionAPI) {
 					if (summary.credentials > 0) notes.push(`凭据 ${summary.credentials} 项`);
 					if (summary.endpoints > 0) notes.push(`接口端点 ${summary.endpoints} 个`);
 					if (summary.compromisedHosts > 0) notes.push(`⚡ PWNED 主机 ${summary.compromisedHosts} 台`);
-					(event.content as Array<{ type: string; text?: string }>).push({
-						type: "text",
-						text: `【PiX 超图机制自动水合】底层已自动提取并入账超图：${notes.join("、")}。`,
-					});
+						(event.content as Array<{ type: string; text?: string }>).push({
+							type: "text",
+							text: `【PiX 超图机制自动水合】底层已自动提取并入账超图：${notes.join("、")}。`,
+						});
+					}
+
+					// 石碑大产物下沉与上下文解耦 (Artifact Tiering: >2KB 物理落盘)
+					const { saveArtifact } = await import("./artifacts.ts");
+					const art = saveArtifact(event.toolName, cmd, text);
+					if (art.isSaved) {
+						event.content = [{ type: "text", text: art.summaryText }];
+					}
 				}
-			}
-		});
+			});
 
 	// -----------------------------------------------------------------------
 	// 命令
@@ -1141,17 +1148,49 @@ export default function (pi: ExtensionAPI) {
 						details: { file: res.file },
 					};
 				}
-				const res = exportGroundTruthJson();
-				return {
-					content: [
-						{
-							type: "text",
-							text: `结构化事实快照（JSON）已导出至：\n${res.file}\n（包含 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点），可供任意自定义模板水合填充。`,
-						},
-					],
-					details: { file: res.file, statistics: res.data.statistics },
-				};
+					const res = exportGroundTruthJson();
+					return {
+						content: [
+							{
+								type: "text",
+								text: `结构化事实快照（JSON）已导出至：\n${res.file}\n（包含 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点），可供任意自定义模板水合填充。`,
+							},
+						],
+						details: { file: res.file, statistics: res.data.statistics },
+					};
+				},
+			});
+
+		// --- 工具 17：get_artifact（切片读取已下沉的大产物文件） ---
+		pi.registerTool({
+			name: "get_artifact",
+			label: "切片读取已下沉的大产物文件",
+			description: "当渗透工具输出过大被石碑机制下沉至 .pix/artifacts/ 时，可通过本工具按行切片精准读取详细内容，防止全局上下文爆炸。",
+			parameters: Type.Object({
+				artifactPath: Type.String({ description: "产物文件路径，如 .pix/artifacts/art_xxxx.log" }),
+				offset: Type.Optional(Type.Integer({ description: "起始行号（从 0 开始），默认 0" })),
+				limit: Type.Optional(Type.Integer({ description: "读取行数（默认 50，最大 200）" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const { readArtifactSlice } = await import("./artifacts.ts");
+				try {
+					const res = readArtifactSlice(params.artifactPath, params.offset ?? 0, Math.min(params.limit ?? 50, 200));
+					return {
+						content: [
+							{
+								type: "text",
+								text: `【产物切片】文件: ${res.filePath} (总行数: ${res.totalLines} | 当前区间: ${res.offset}~${res.offset + res.limit} | 更多: ${res.hasMore})\n\n${res.content}`,
+							},
+						],
+						details: { totalLines: res.totalLines, hasMore: res.hasMore },
+					};
+				} catch (err: any) {
+					return {
+						content: [{ type: "text", text: `读取产物失败: ${err.message}` }],
+						details: {},
+					};
+				}
 			},
 		});
 
-	}
+		}
