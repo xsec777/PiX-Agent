@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.0（2026-11-09）— Anti-Sloth 刚性结案门禁与 L4 深度证伪校验
+
+- 新增 `agent_before_settle` Anti-Sloth 门禁：存在未闭环端点时拒绝提前结束，并提示优先端点；
+- `update_endpoint` 在状态改为 `rejected` 前执行 L4 证伪检查，少于 3 次测试则拒绝流转；
+- 增加 `verifyAntiSlothGate` 与 `verifyL4Falsification` 门禁函数；
+- 修复 `tactical-loader.ts` 严格编译结构及未使用导入，统一相关模块类型导入；
+- 版本号、README 徽标和发行元数据同步升级至 `2.4.0`。
+
 ## 2.3.0（2026-11-09）— 基于接口台账闭环率的实时调度提示词投影
 
 - `rules.ts` 每轮动态计算全局端点闭环率、坐实数、变异中与探针中指标；
