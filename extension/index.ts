@@ -42,9 +42,10 @@ import {
 	recordHost,
 	recordPivotSession,
 	recordCredential,
-	recordEndpoint,
-	updateEndpointStatus,
-	historySummary,
+		recordEndpoint,
+		updateEndpointStatus,
+		getAllEndpoints,
+		historySummary,
 	setHistoryLines,
 	resetSectionLines,
 	elapsedMinutes,
@@ -203,13 +204,37 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 	// agent_end：画板有新增（节点或边）时自动落一份轻量快照（复盘用，零打扰）
 	// -----------------------------------------------------------------------
-	let nodeCountAtStart = 0;
-	let edgeCountAtStart = 0;
-	pi.on("session_start", () => {
-		nodeCountAtStart = getState().nodes.length;
-		edgeCountAtStart = getState().edges.length;
-	});
-	pi.on("agent_end", async () => {
+		let nodeCountAtStart = 0;
+		let edgeCountAtStart = 0;
+		pi.on("session_start", () => {
+			nodeCountAtStart = getState().nodes.length;
+			edgeCountAtStart = getState().edges.length;
+		});
+
+		// -----------------------------------------------------------------------
+		// agent_before_settle：防偷懒结案刚性门禁 (Anti-Sloth Gate)
+		// -----------------------------------------------------------------------
+		const registerSettleHook = pi.on as unknown as (
+			eventName: string,
+			handler: () => Promise<{ continue: true; entries: { customType: string; text: string }[] } | void>,
+		) => void;
+		registerSettleHook.call(pi, "agent_before_settle", async () => {
+			const { verifyAntiSlothGate } = await import("./gate.ts");
+			const verdict = verifyAntiSlothGate();
+			if (verdict.blocked) {
+				return {
+					continue: true,
+					entries: [
+						{
+							customType: "system_intervention",
+							text: verdict.message,
+						},
+					],
+				};
+			}
+		});
+
+		pi.on("agent_end", async () => {
 		const state = getState();
 		if (state.nodes.length === nodeCountAtStart && state.edges.length === edgeCountAtStart) return;
 		nodeCountAtStart = state.nodes.length;
@@ -1102,13 +1127,28 @@ export default function (pi: ExtensionAPI) {
 					evidenceResponse: Type.Optional(Type.String({ description: "关键响应差分证据切片 (Response Snippet)" })),
 					diffSignature: Type.Optional(Type.String({ description: "差分特征标识 (如状态码/回显特征/时延)" })),
 				}),
-				async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
-					const ep = updateEndpointStatus(params.idOrUrl, params.status as EndpointStatus, {
-						vuln: params.vulnerability,
-						evidenceRequest: params.evidenceRequest,
-						evidenceResponse: params.evidenceResponse,
-						diffSignature: params.diffSignature,
-					});
+					async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+						if (params.status === "rejected") {
+							const allEps = getAllEndpoints();
+							const currentEp = allEps.find((e) => e.id === params.idOrUrl || e.url === params.idOrUrl);
+							if (currentEp) {
+								const { verifyL4Falsification } = await import("./gate.ts");
+								const l4Check = verifyL4Falsification(currentEp);
+								if (!l4Check.allowed) {
+									return {
+										content: [{ type: "text", text: l4Check.reason! }],
+										details: { blocked: true },
+									};
+								}
+							}
+						}
+
+						const ep = updateEndpointStatus(params.idOrUrl, params.status as EndpointStatus, {
+							vuln: params.vulnerability,
+							evidenceRequest: params.evidenceRequest,
+							evidenceResponse: params.evidenceResponse,
+							diffSignature: params.diffSignature,
+						});
 						if (!ep) {
 							return {
 								content: [{ type: "text", text: `未找到接口「${params.idOrUrl}」，请先通过 record_endpoint 登记。` }],
