@@ -42,10 +42,10 @@ import {
 	recordHost,
 	recordPivotSession,
 	recordCredential,
-		recordEndpoint,
-		updateEndpointStatus,
-		getAllEndpoints,
-		historySummary,
+	recordEndpoint,
+	updateEndpointStatus,
+	getAllEndpoints,
+	historySummary,
 	setHistoryLines,
 	resetSectionLines,
 	elapsedMinutes,
@@ -1224,12 +1224,82 @@ export default function (pi: ExtensionAPI) {
 						],
 						details: { totalLines: res.totalLines, hasMore: res.hasMore },
 					};
-				} catch (err: any) {
-					return {
-						content: [{ type: "text", text: `读取产物失败: ${err.message}` }],
-						details: {},
-					};
-				}
+					} catch (err: any) {
+						return {
+							content: [{ type: "text", text: `读取产物失败: ${err.message}` }],
+							details: {},
+						};
+					}
+				},
+			});
+
+		// --- 工具 18：verify_finding（候选漏洞真假差分二次复验器） ---
+		pi.registerTool({
+			name: "verify_finding",
+			label: "二次差分自动复测校验",
+			description:
+				"当怀疑存在 SQL 注入、未授权越权或逻辑绕过时，通过本工具输入两次真假探针的响应数据，由底层机械算法比对状态码、时延和长度波动率，给出确定性结论，杜绝模型幻觉。",
+			parameters: Type.Object({
+				targetUrl: Type.String({ description: "测试目标完整 URL" }),
+				vulnType: Type.Union(
+					[
+						Type.Literal("sqli_boolean"),
+						Type.Literal("sqli_time"),
+						Type.Literal("auth_bypass"),
+						Type.Literal("idor"),
+						Type.Literal("generic"),
+					],
+					{ description: "漏洞类型" },
+				),
+				truePayload: Type.String({ description: "真探针 (触发异常或延时或绕过的 Payload)" }),
+				trueStatus: Type.Integer({ description: "真探针返回的 HTTP 状态码" }),
+				trueBody: Type.String({ description: "真探针返回的响应体内容或错误片段" }),
+				trueTimeMs: Type.Integer({ description: "真探针耗时毫秒数" }),
+				falsePayload: Type.Optional(Type.String({ description: "假探针 (对照组 Payload)" })),
+				falseStatus: Type.Optional(Type.Integer({ description: "假探针返回的 HTTP 状态码" })),
+				falseBody: Type.Optional(Type.String({ description: "假探针返回的响应体内容" })),
+				falseTimeMs: Type.Optional(Type.Integer({ description: "假探针耗时毫秒数" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const { evaluateDifferential } = await import("./verifier.ts");
+				const verdict = evaluateDifferential(
+					{
+						targetUrl: params.targetUrl,
+						vulnType: params.vulnType as any,
+						truePayload: params.truePayload,
+						falsePayload: params.falsePayload,
+					},
+					{
+						status: params.trueStatus,
+						body: params.trueBody,
+						timeMs: params.trueTimeMs,
+					},
+					params.falseStatus !== undefined
+						? {
+								status: params.falseStatus,
+								body: params.falseBody || "",
+								timeMs: params.falseTimeMs || 0,
+						  }
+						: undefined,
+				);
+
+				return {
+					content: [
+						{
+							type: "text",
+							text:
+								`【PiX 机械差分复验报告】结论: ${verdict.verdict.toUpperCase()} (置信度: ${verdict.confidence})\n` +
+								`分析概要: ${verdict.summary}\n` +
+								(verdict.diffSignature ? `差分特征: ${verdict.diffSignature}\n` : "") +
+								(verdict.verdict === "confirmed"
+									? `✓ 证据已坐实！请立即调用 update_endpoint 将该端点流转为 confirmed，并绑定 evidenceRequest/evidenceResponse！`
+									: verdict.verdict === "rejected"
+										? `✗ 证据充分证伪！真假请求无任何差分，可流转为 rejected 排除。`
+										: `? 差分未达门槛！建议流转为 bypassing 调整参数再次变异。`),
+						},
+					],
+					details: { ...verdict },
+				};
 			},
 		});
 
