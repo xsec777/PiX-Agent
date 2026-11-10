@@ -1283,22 +1283,67 @@ export default function (pi: ExtensionAPI) {
 						: undefined,
 				);
 
+					return {
+						content: [
+							{
+								type: "text",
+								text:
+									`【PiX 机械差分复验报告】结论: ${verdict.verdict.toUpperCase()} (置信度: ${verdict.confidence})\n` +
+									`分析概要: ${verdict.summary}\n` +
+									(verdict.diffSignature ? `差分特征: ${verdict.diffSignature}\n` : "") +
+									(verdict.verdict === "confirmed"
+										? `✓ 证据已坐实！请立即调用 update_endpoint 将该端点流转为 confirmed，并绑定 evidenceRequest/evidenceResponse！`
+										: verdict.verdict === "rejected"
+											? `✗ 证据充分证伪！真假请求无任何差分，可流转为 rejected 排除。`
+											: `? 差分未达门槛！建议流转为 bypassing 调整参数再次变异。`),
+							},
+						],
+						details: { ...verdict },
+					};
+				},
+			});
+
+		// --- 工具 19：mutate_payload（基于阻断反馈的自适应变异生成器） ---
+		pi.registerTool({
+			name: "mutate_payload",
+			label: "自适应变异生成器",
+			description:
+				"当遇到 403 阻断、WAF 拦截或端点处于 bypassing 状态时，通过本工具生成 5 级变异 Payload（涵盖双重 URL 编码、Unicode、内联注释、请求头伪造、分块走私等），用于实质穷尽变异维度。",
+			parameters: Type.Object({
+				rawPayload: Type.String({ description: "被拦截或需要变异的原始 Payload" }),
+				category: Type.Optional(
+					Type.Union(
+						[
+							Type.Literal("sqli"),
+							Type.Literal("cmdi"),
+							Type.Literal("path_traversal"),
+							Type.Literal("auth_bypass"),
+							Type.Literal("generic"),
+						],
+						{ description: "漏洞类别，默认 generic" },
+					),
+				),
+				maxLevel: Type.Optional(Type.Integer({ description: "允许生成的最高变异等级 (1~5)，默认 4" })),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const { generateMutations } = await import("./mutator.ts");
+				const list = generateMutations(params.rawPayload, params.category as any, params.maxLevel ?? 4);
+				const formatted = list.map((m, idx) => {
+					let hStr = "";
+					if (m.suggestedHeaders) {
+						hStr = ` (附带请求头: ${JSON.stringify(m.suggestedHeaders)})`;
+					}
+					return `${idx + 1}. [L${m.level} - ${m.name}] ${m.technique}\n   Payload: ${m.payload}${hStr}`;
+				});
+
 				return {
 					content: [
 						{
 							type: "text",
-							text:
-								`【PiX 机械差分复验报告】结论: ${verdict.verdict.toUpperCase()} (置信度: ${verdict.confidence})\n` +
-								`分析概要: ${verdict.summary}\n` +
-								(verdict.diffSignature ? `差分特征: ${verdict.diffSignature}\n` : "") +
-								(verdict.verdict === "confirmed"
-									? `✓ 证据已坐实！请立即调用 update_endpoint 将该端点流转为 confirmed，并绑定 evidenceRequest/evidenceResponse！`
-									: verdict.verdict === "rejected"
-										? `✗ 证据充分证伪！真假请求无任何差分，可流转为 rejected 排除。`
-										: `? 差分未达门槛！建议流转为 bypassing 调整参数再次变异。`),
+							text: `【PiX 自适应变异引擎】针对「${params.rawPayload}」生成了 ${list.length} 个候选变异向量：\n\n${formatted.join("\n\n")}\n\n【纪律提示】：请选用上述变异向量继续测试端点，测试结果及时调用 update_endpoint 回写状态机。`,
 						},
 					],
-					details: { ...verdict },
+					details: { count: list.length, mutations: list },
 				};
 			},
 		});
