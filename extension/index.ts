@@ -1357,4 +1357,30 @@ export default function (pi: ExtensionAPI) {
 			},
 		});
 
-		}
+		// RC2 安全版：显式单目标凭据兼容性检查；不遍历全网、不生成认证命令、不发起连接。
+		pi.registerTool({
+			name: "analyze_credential_target",
+			label: "单目标凭据范围兼容性分析",
+			description:
+				"仅对调用者显式指定的一个 Host ID 与一个 Credential ID，检查凭据 validTargets 范围和已登记服务端口是否兼容。只返回本地元数据分析，不验证凭据、不生成登录/喷洒/横向命令，也不连接目标。仅限书面授权范围内使用。",
+			parameters: Type.Object({
+				targetHostId: Type.String({ description: "单个已登记目标 Host ID" }),
+				credentialId: Type.String({ description: "单个已登记 Credential ID；不得传凭据值" }),
+			}),
+			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+				const { analyzeCredentialCompatibility } = await import("./cred-vault.ts");
+				const result = analyzeCredentialCompatibility(params.targetHostId, params.credentialId);
+				if (!result) {
+					return {
+						content: [{ type: "text", text: "未找到指定 Host 或 Credential ID。请先在授权范围内登记资产与凭据。" }],
+						details: { found: false },
+					};
+				}
+				return {
+					content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+					details: result,
+				};
+			},
+		});
+
+	}
