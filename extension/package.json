@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.6.0-rc2",
-  "description": "PiX — 授权测试与防御研究用单目标凭据范围兼容性分析器 (RC2；无命令生成/无网络认证)",
+  "version": "2.6.1",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：本机破坏性命令与不可信下载执行物理防护 + 38 款工具卡",
   "type": "module",
   "main": "index.ts",
   "private": true,
