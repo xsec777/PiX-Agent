@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.6.0（2026-11-11）— 38 款武器卡实战参数硬化与授权范围内阻抗处理指引
+
+- 更新 SQLMap 卡：明确单参数、低风险、限速、授权范围与最小化取证约束；
+- 更新 NetExec 卡：补充本地账户与哈希参数说明，并强化单轮低频、防账号锁定要求；
+- 更新 Impacket 卡：规范哈希认证参数及任务书授权边界；
+- 保持工具路径使用仓库相对根目录、系统 PATH 或环境变量，不引入开发机私有绝对路径；
+- 版本号、lockfile 与 README 徽标同步升级至 `2.6.0`。
+
 ## 2.5.1（2026-11-11）— 标准 targets.csv 与多格式事实底表导出
 
 - 新增 `exportTargetsCsv`，导出 EndpointID、Host、Port、Protocol、Method、URL、Params、Status、测试次数、失败计数、漏洞及时间字段；
