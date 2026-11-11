@@ -301,11 +301,13 @@ export const TOOLBOX: ToolCard[] = [
 		invocation: "cd <workdir> && NO_PROXY=127.0.0.1,localhost HTTP_PROXY= HTTPS_PROXY= <runtime> sqlmap.py -r <请求文件.txt> -p <参数> --batch --level 2 --risk 1",
 		hardRules: [
 			"所有调用一律加 --batch（含 --version/-h，否则停在 Press Enter 挂死编排）",
-			"必加 -p 指定参数（否则全参数扫）",
+			"必加 -p 指定单一已确认参数（否则全参数扫）",
+			"遇授权范围内的 WAF 阻断，可在低风险验证中使用 --tamper=space2comment,between,randomcase；超出范围或触及写操作须先确认",
+			"仅对授权目标低频执行 --random-agent --threads=3；遵守目标方速率限制，遇 429/封禁立即停止并降速",
 			"无明确注入点不跑（禁全站裸扫）",
 			"禁全量 --dump：总量计数 + LIMIT 3~5 最小真实样本证明能拖多少",
 		],
-		params: ["-r 请求文件（保 Cookie/鉴权，推荐）", "-p 参数", "--batch 非交互", "--level/--risk 默认 1/1", "--dbs/-D --tables 取证链"],
+		params: ["-r 请求文件（保 Cookie/鉴权，推荐）", "-p 参数", "--batch 非交互", "--tamper=脚本（仅授权范围内低风险验证）", "--random-agent", "--threads=3", "--level/--risk 默认 1/1", "--dbs/-D --tables 取证链"],
 		rate: "--level 2 --risk 1（--risk 3 破坏性慎用）",
 		traps: ["产出在 ~/.local/share/sqlmap/output/<host>/", "清代理"],
 	},
@@ -417,7 +419,7 @@ export const TOOLBOX: ToolCard[] = [
 		runtime: "direct",
 		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe") ? TOOLS_ROOT + "\\03_Intranet\\netexec\\nxc.exe" : "nxc",
 		invocation: "<path> smb <目标> -u <用户> -p <密码> --shares",
-		hardRules: ["redt 模式须任务书覆盖；凭据喷洒单轮低频", "需 Python 3.11+（pip 装 git+https://github.com/Pennyw0rth/NetExec；PyPI 已无 netexec 包）"],
+		hardRules: ["redt 模式须任务书明确覆盖；凭据验证仅限授权账号并单轮低频，遇锁定/限流立即停止", "支持 --local-auth 本地账户认证；哈希认证使用 -H <NTLM_HASH>"],
 	},
 	{
 		name: "impacket",
@@ -427,8 +429,8 @@ export const TOOLBOX: ToolCard[] = [
 		tested: true,
 		runtime: "python",
 		path: existsSync(TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py") ? TOOLS_ROOT + "\\03_Intranet\\impacket\\secretsdump.py" : "secretsdump.py",
-		invocation: "<runtime> <path> <域>/<用户>:<密码>@<目标> <域>/<用户>:<密码>@<目标>",
-		hardRules: ["redt 专属：任务书明示允许才用；动作全部留证", "示例脚本在 <runtime> 同级 Scripts/ 下"],
+		invocation: "<runtime> <path> <域>/<用户>:<密码>@<目标>",
+		hardRules: ["redt 专属：任务书明示允许才用；动作全部留证；仅对授权目标执行", "哈希认证参数使用 -hashes :<NTLM_HASH>", "示例脚本在 <runtime> 同级 Scripts/ 下"],
 	},
 	// ------------------------------------------------ cloud（只读口径）
 

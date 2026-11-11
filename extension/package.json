@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.5.1",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：标准 targets.csv/JSON/Markdown 事实底表导出 + 5 级自适应变异引擎",
+  "version": "2.6.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：38 款工具卡实战参数硬化与授权范围内 WAF/变异安全指引",
   "type": "module",
   "main": "index.ts",
   "private": true,
