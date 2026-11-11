@@ -537,17 +537,20 @@ export default function (pi: ExtensionAPI) {
 			},
 		});
 
-		pi.registerCommand("facts", {
-			description: "导出客观事实底表（用法: /facts 导出纯数据 Markdown 底表；/facts json 导出高保真结构化 JSON）",
-			handler: async (args, ctx) => {
-				const isJson = args.trim().toLowerCase() === "json";
-				const { exportGroundTruthJson, exportGroundTruthMarkdown } = await import("./exporter.ts");
-				if (isJson) {
-					const res = exportGroundTruthJson();
-					ctx.ui.notify(
-						`结构化事实底表已导出：${res.file}（已锁定 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点）`,
-						"info",
-					);
+			pi.registerCommand("facts", {
+				description: "导出客观事实底表（用法: /facts 导出纯数据 Markdown 底表；/facts json 导出高保真 JSON；/facts csv 导出 targets.csv）",
+				handler: async (args, ctx) => {
+					const mode = args.trim().toLowerCase();
+					const { exportGroundTruthJson, exportGroundTruthMarkdown, exportTargetsCsv } = await import("./exporter.ts");
+					if (mode === "json") {
+						const res = exportGroundTruthJson();
+						ctx.ui.notify(
+							`结构化事实底表已导出：${res.file}（已锁定 ${res.data.statistics.confirmedFindingsCount} 项漏洞、${res.data.statistics.hostsCount} 台主机、${res.data.statistics.endpointsCount} 个端点）`,
+							"info",
+						);
+					} else if (mode === "csv") {
+						const res = exportTargetsCsv();
+						ctx.ui.notify(`目标流转底表已导出：${res.file}（共 ${res.count} 个端点，已适配标准下游渗透工具）`, "info");
 					} else {
 						const res = exportGroundTruthMarkdown();
 						ctx.ui.notify(`客观事实底表已导出：${res.file}（零主观废话，纯数据与原始请求响应包）`, "info");
@@ -1169,25 +1172,31 @@ export default function (pi: ExtensionAPI) {
 				},
 		});
 
-		// --- 工具 16：export_facts（一键导出结构化事实底表） ---
-		pi.registerTool({
-			name: "export_facts",
-			label: "导出客观事实底表",
-			description:
-				"一键冻结并导出超图全量客观事实底表（支持 format='json' 导出机器可读高保真数据，或 format='md' 导出表格化事实）。供填入任何报告模板。",
-			parameters: Type.Object({
-				format: Type.Optional(Type.Union([Type.Literal("json"), Type.Literal("md")], { description: "导出格式，默认 json" })),
-			}),
-			async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
-				const isMd = params.format === "md";
-				const { exportGroundTruthJson, exportGroundTruthMarkdown } = await import("./exporter.ts");
-				if (isMd) {
-					const res = exportGroundTruthMarkdown();
-					return {
-						content: [{ type: "text", text: `客观事实底表已导出至：\n${res.file}\n\n预览片段：\n${res.text.slice(0, 500)}...` }],
-						details: { file: res.file },
-					};
-				}
+			// --- 工具 16：export_facts（一键导出结构化事实底表） ---
+			pi.registerTool({
+				name: "export_facts",
+				label: "导出客观事实底表",
+				description:
+					"一键冻结并导出超图全量客观事实底表（支持 format='json' 导出机器可读高保真数据，format='csv' 导出 targets.csv，或 format='md' 导出表格化事实）。供填入任何报告模板或喂给下游工具。",
+				parameters: Type.Object({
+					format: Type.Optional(Type.Union([Type.Literal("json"), Type.Literal("md"), Type.Literal("csv")], { description: "导出格式，默认 json" })),
+				}),
+				async execute(_toolCallId, params): Promise<AgentToolResult<any>> {
+					const { exportGroundTruthJson, exportGroundTruthMarkdown, exportTargetsCsv } = await import("./exporter.ts");
+					if (params.format === "md") {
+						const res = exportGroundTruthMarkdown();
+						return {
+							content: [{ type: "text", text: `客观事实底表已导出至：\n${res.file}\n\n预览片段：\n${res.text.slice(0, 500)}...` }],
+							details: { file: res.file },
+						};
+					}
+					if (params.format === "csv") {
+						const res = exportTargetsCsv();
+						return {
+							content: [{ type: "text", text: `目标流转表 (CSV) 已导出至：\n${res.file}\n包含 ${res.count} 个端点记录，已格式化适配下游渗透工具直接消费。` }],
+							details: { file: res.file, count: res.count },
+						};
+					}
 					const res = exportGroundTruthJson();
 					return {
 						content: [
