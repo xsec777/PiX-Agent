@@ -1,0 +1,9 @@
+feat(cred): 增加单目标凭据范围兼容性分析器 (v2.6.0-rc2)
+
+- RC2 安全收敛版 (仅授权测试、自建靶场与防御性研究)：
+  * 新增 extension/cred-vault.ts，用于本地比对一个显式指定 Host ID 与一个 Credential ID 的授权范围及已登记服务端口；
+  * 工具要求调用者明确提供单个 targetHostId 与 credentialId，不遍历全网或组合生成横向目标列表；
+  * 仅输出凭据类型、权限范围、Host 已登记端口及 validTargets 是否匹配；不返回凭据值，不生成登录、喷洒、PtH、远程执行或隧道命令；
+  * 不进行网络连接、凭据验证或远程执行；结果明确标记 analysisOnly=true；
+  * 新增 acceptance/cred-vault-scope.test.ts，验证单目标选择、范围匹配、端口兼容与无秘密值输出；
+  * extension/package.json 与 package-lock.json 版本号升级至 2.6.0-rc2。
