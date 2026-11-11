@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.1（2026-11-11）— 标准 targets.csv 与多格式事实底表导出
+
+- 新增 `exportTargetsCsv`，导出 EndpointID、Host、Port、Protocol、Method、URL、Params、Status、测试次数、失败计数、漏洞及时间字段；
+- CSV 字段采用标准双引号包裹及双引号转义，便于表格软件和下游流水线解析；
+- `/facts csv` 与 `export_facts` 的 `format: "csv"` 均可导出 `pix-targets-<timestamp>.csv`；
+- 同步安装器所需模块清单、`package.json`、lockfile、README 徽标与 CHANGELOG 至 `2.5.1`。
+
 ## 2.5.0（2026-11-10）— 基于阻断反馈的自适应 Payload 变异生成器
 
 - 新增 `extension/mutator.ts` 五级变异流水线：编码置换、语法混淆、请求头伪造、协议分块及语义等价替代；
