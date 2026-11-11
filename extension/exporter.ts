@@ -238,3 +238,52 @@ export function exportGroundTruthMarkdown(): { file: string; text: string } {
 	writeFileSync(file, text, "utf8");
 	return { file, text };
 }
+
+/**
+ * 导出下游工具使用的标准 targets.csv 事实清单
+ */
+function csvCell(value: unknown): string {
+	const text = value == null ? "" : String(value);
+	return `"${text.replace(/"/g, '""')}"`;
+}
+
+export function exportTargetsCsv(): { file: string; text: string; count: number } {
+	const endpoints = getAllEndpoints();
+	const L: string[] = [];
+	L.push("EndpointID,Host,Port,Protocol,Method,URL,Params,Status,TestedTimes,FailureStreak,Vulnerabilities,LastTestedAt");
+
+	for (const ep of endpoints) {
+		let host = "unknown";
+		let port = "80";
+		let proto = "http";
+		try {
+			const u = new URL(ep.url);
+			host = u.hostname;
+			port = u.port || (u.protocol === "https:" ? "443" : "80");
+			proto = u.protocol.replace(":", "");
+		} catch {}
+
+		const paramsStr = (ep.params || []).join(";");
+		const vulnsStr = (ep.vulnerabilities || []).join(";");
+		L.push([
+			csvCell(ep.id),
+			csvCell(host),
+			csvCell(port),
+			csvCell(proto),
+			csvCell(ep.method),
+			csvCell(ep.url),
+			csvCell(paramsStr),
+			csvCell(ep.status),
+			String(ep.testedTimes ?? 0),
+			String(ep.failureStreak ?? 0),
+			csvCell(vulnsStr),
+			csvCell(ep.lastTestedAt),
+		].join(","));
+	}
+
+	const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+	const file = join(process.cwd(), `pix-targets-${ts}.csv`);
+	const text = L.join("\n");
+	writeFileSync(file, text, "utf8");
+	return { file, text, count: endpoints.length };
+}
