@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.6.0",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：38 款工具卡实战参数硬化与授权范围内 WAF/变异安全指引",
+  "version": "2.6.1",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：本机破坏性命令与不可信下载执行物理防护 + 38 款工具卡",
   "type": "module",
   "main": "index.ts",
   "private": true,
