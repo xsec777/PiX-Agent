@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.6.1",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：本机破坏性命令与不可信下载执行物理防护 + 38 款工具卡",
+  "version": "2.7.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：JIT 战术同义词路由 + 有界缓存 + 结构感知上下文切片",
   "type": "module",
   "main": "index.ts",
   "private": true,
