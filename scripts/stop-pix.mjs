@@ -8,10 +8,10 @@ console.log("正在排查并关闭 PiX 服务与关联进程...");
 const pidSet = new Set();
 const currentPid = String(process.pid);
 
-// 1. 查找监听 30141 端口的进程
+// 1. 查找监听 30141 (Web) 与 30142 (只读矩阵大屏) 端口的进程
 try {
   const portOut = execSync(
-    `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
+    `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141,30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
     { encoding: "utf8" }
   );
   for (const p of portOut.split(/\s+/)) {
@@ -22,10 +22,10 @@ try {
   }
 } catch {}
 
-// 2. 查找命令行含 pi-web 或 models-sync 的守护进程 (排除 powershell 自查进程与当前进程)
+// 2. 查找命令行含 pi-web、models-sync 或 matrix-server 的守护进程 (排除 powershell 自查进程与当前进程)
 try {
   const cmdOut = execSync(
-    `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -ne 'powershell.exe' -and $_.Name -ne 'pwsh.exe' -and $_.CommandLine -notmatch 'stop-pix' -and ($_.CommandLine -match 'pi-web\\.js|models-sync\\.mjs' -or $_.CommandLine -match 'next start') } | ForEach-Object { $_.ProcessId }"`,
+    `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -ne 'powershell.exe' -and $_.Name -ne 'pwsh.exe' -and $_.CommandLine -notmatch 'stop-pix' -and ($_.CommandLine -match 'pi-web\\.js|models-sync\\.mjs|matrix-server\\.mjs' -or $_.CommandLine -match 'next start') } | ForEach-Object { $_.ProcessId }"`,
     { encoding: "utf8" }
   );
   for (const p of cmdOut.split(/\s+/)) {
@@ -52,7 +52,7 @@ for (const pid of pidSet) {
 let stillInUse = false;
 try {
   const check = execSync(
-    `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
+		`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141,30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
     { encoding: "utf8" }
   );
   if (/\d+/.test(check)) stillInUse = true;
