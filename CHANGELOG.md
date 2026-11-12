@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.7.1（2026-11-12）— 零依赖 30142 SSE 实时只读资产监控大屏
+
+- 新增 `scripts/matrix-server.mjs`，使用 Node.js 原生 http/fs/path 提供本地 SSE 实时大屏与 `/api/matrix` 只读快照接口；
+- `PiX-Web.cmd` 启动流程增加 30142 矩阵服务，显示大屏地址；
+- `scripts/stop-pix.mjs` 增加 30142 监听端口与 `matrix-server.mjs` 后台进程清理；
+- 服务明确拒绝非 GET/HEAD/OPTIONS 方法，返回 405，保持纯只读遥测；
+- HTTP 冒烟测试：GET `/api/matrix` 返回 200；POST `/api/matrix` 返回 405；SSE `/events` 返回 `text/event-stream`。
+
+## 2.7.0（2026-11-12）— JIT 战术同义词路由、查询缓存与结构感知上下文切片
+
 ## 2.7.0（2026-11-12）— JIT 战术同义词路由、查询缓存与结构感知上下文切片
 
 - 扩展 ADCS/ESC1、NTLM/PTH、Kerberos/ticket、tunnel、lateral 等战术同义词路由，并提高别名目标匹配权重；

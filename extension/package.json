@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.7.0",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：JIT 战术同义词路由 + 有界缓存 + 结构感知上下文切片",
+  "version": "2.7.1",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：30142 实时 SSE 只读资产监控服务 + 战术 JIT 路由",
   "type": "module",
   "main": "index.ts",
   "private": true,

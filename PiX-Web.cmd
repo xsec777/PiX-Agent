@@ -26,19 +26,23 @@ if defined PORT_PID (
     exit /b 0
 )
 
-echo [1/3] 检查并同步最新扩展与武器库...
+echo [1/4] 检查并同步最新扩展与武器库...
 call node scripts\install.mjs --no-patch >nul 2>&1
 
-echo [2/3] 启动模型缓存同步器...
+echo [2/4] 启动模型缓存同步器...
 start "pix-sync" /min node "%~dp0scripts\models-sync.mjs" --watch
 
-echo [3/3] 正在拉起 Web 服务并打开浏览器...
+echo [3/4] 启动只读实时矩阵大屏 (30142)...
+start "pix-matrix" /min node "%~dp0scripts\matrix-server.mjs"
+
+echo [4/4] 正在拉起 Web 服务并打开浏览器...
 start http://127.0.0.1:30141
 
 echo.
 echo ========================================================
 echo  🟢 PiX 服务已启动！
-echo  访问地址: http://127.0.0.1:30141
+echo  Web 控制台:   http://127.0.0.1:30141
+echo  矩阵大屏:     http://127.0.0.1:30142
 echo ========================================================
 echo.
 echo  【关闭方式提示】：
