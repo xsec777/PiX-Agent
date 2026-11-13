@@ -15,6 +15,10 @@ del "%temp%\pix_port_check.tmp" 2>nul
 
 if defined PORT_PID (
     echo [提示] 检测到 PiX 服务已在运行中 (PID: %PORT_PID%)
+    powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique" > "%temp%\pix_matrix_check.tmp" 2>nul
+    set /p MATRIX_PID=<"%temp%\pix_matrix_check.tmp"
+    del "%temp%\pix_matrix_check.tmp" 2>nul
+    if not defined MATRIX_PID start "pix-matrix" /min node "%~dp0scripts\matrix-server.mjs"
     echo 正在自动为你打开浏览器: http://127.0.0.1:30141
     start http://127.0.0.1:30141
     echo.

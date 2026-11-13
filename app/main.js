@@ -8,10 +8,12 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require("electron");
 const path = require("path");
 const http = require("http");
-const { spawn, execSync } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const PORT = 30141;
+const MATRIX_PORT = 30142;
 const TARGET_URL = `http://127.0.0.1:${PORT}`;
+const MATRIX_URL = `http://127.0.0.1:${MATRIX_PORT}`;
 const APP_DIR = __dirname;
 const PROJECT_DIR = path.resolve(APP_DIR, "..");
 
@@ -19,6 +21,7 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let backendProcess = null;
+let matrixProcess = null;
 
 // 单实例锁 (防止重复打开多个窗口)
 const gotTheLock = app.requestSingleInstanceLock();
@@ -46,6 +49,15 @@ function checkPortOpen(port) {
       resolve(false);
     });
   });
+}
+
+function stopOwnedProcess(child) {
+  if (!child || child.killed || child.exitCode !== null) return;
+  if (process.platform === "win32" && child.pid) {
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+  } else {
+    child.kill();
+  }
 }
 
 function findPiWebJs() {
@@ -89,19 +101,27 @@ function startBackendServer() {
   }
 }
 
+async function ensureMatrixServer() {
+  if (await checkPortOpen(MATRIX_PORT)) return true;
+  if (matrixProcess && matrixProcess.exitCode === null) return true;
+  const matrixScript = path.join(PROJECT_DIR, "scripts", "matrix-server.mjs");
+  if (!require("fs").existsSync(matrixScript)) return false;
+
+  matrixProcess = spawn("node", [matrixScript], {
+    cwd: resolveWorkDir(),
+    env: { ...process.env, PIX_MATRIX_HOST: "127.0.0.1", PIX_MATRIX_PORT: String(MATRIX_PORT) },
+    windowsHide: true,
+    stdio: "ignore"
+  });
+  matrixProcess.once("error", () => { matrixProcess = null; });
+  matrixProcess.once("exit", () => { matrixProcess = null; });
+  return true;
+}
+
 function cleanupAndQuit() {
   isQuitting = true;
-  try {
-    const stopScript = path.join(PROJECT_DIR, "scripts", "stop-pix.mjs");
-    if (require("fs").existsSync(stopScript)) {
-      execSync(`node "${stopScript}"`, { windowsHide: true, stdio: "ignore" });
-    }
-  } catch {}
-  if (backendProcess) {
-    try {
-      backendProcess.kill();
-    } catch {}
-  }
+  stopOwnedProcess(matrixProcess);
+  stopOwnedProcess(backendProcess);
   app.quit();
 }
 
@@ -112,7 +132,7 @@ function createTray(iconPath) {
   tray = new Tray(trayImage);
   tray.setToolTip("PiX");
 
-  const updateMenu = (isRunning) => {
+  const updateMenu = (isRunning, matrixRunning = false) => {
     const contextMenu = Menu.buildFromTemplate([
       {
         label: "显示 PiX 主界面",
@@ -123,9 +143,14 @@ function createTray(iconPath) {
           }
         }
       },
+      {
+        label: "📊 攻击面实时进度看板 (:30142)",
+        enabled: matrixRunning,
+        click: () => require("electron").shell.openExternal(MATRIX_URL)
+      },
       { type: "separator" },
       {
-        label: isRunning ? "服务状态: 🟢 运行中 (30141)" : "服务状态: ⚪ 未就绪",
+        label: isRunning ? "服务状态: 🟢 运行中 (30141 / 30142)" : "服务状态: ⚪ 未就绪",
         enabled: false
       },
       { type: "separator" },
@@ -139,7 +164,16 @@ function createTray(iconPath) {
     tray.setContextMenu(contextMenu);
   };
 
-  updateMenu(true);
+  const refreshTrayStatus = async () => {
+    const [webRunning, matrixRunning] = await Promise.all([
+      checkPortOpen(PORT),
+      checkPortOpen(MATRIX_PORT)
+    ]);
+    if (tray && !tray.isDestroyed()) updateMenu(webRunning, matrixRunning);
+  };
+  refreshTrayStatus();
+  const trayStatusTimer = setInterval(refreshTrayStatus, 3000);
+  trayStatusTimer.unref?.();
 
   // 双击托盘图标切换窗口显示/隐藏
   tray.on("double-click", () => {
@@ -207,10 +241,9 @@ function createWindow() {
 
   // 检查并连接后端 Web 接口
   async function connectToService() {
-    let running = await checkPortOpen(PORT);
-    if (!running) {
-      startBackendServer();
-    }
+    const running = await checkPortOpen(PORT);
+    if (!running) startBackendServer();
+    await ensureMatrixServer();
 
     // 轮询等待端口就绪 (每 300ms 一次，最多等待 12s)
     let retries = 0;

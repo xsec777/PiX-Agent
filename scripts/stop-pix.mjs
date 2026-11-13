@@ -8,7 +8,7 @@ console.log("正在排查并关闭 PiX 服务与关联进程...");
 const pidSet = new Set();
 const currentPid = String(process.pid);
 
-// 1. 查找监听 30141 (Web) 与 30142 (只读矩阵大屏) 端口的进程
+// 1. 查找监听 30141 (主Web) 与 30142 (矩阵看板) 端口的进程
 try {
   const portOut = execSync(
     `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141,30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
@@ -22,7 +22,7 @@ try {
   }
 } catch {}
 
-// 2. 查找命令行含 pi-web、models-sync 或 matrix-server 的守护进程 (排除 powershell 自查进程与当前进程)
+// 2. 查找命令行含 pi-web、models-sync 或 matrix-server 的守护进程
 try {
   const cmdOut = execSync(
     `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -ne 'powershell.exe' -and $_.Name -ne 'pwsh.exe' -and $_.CommandLine -notmatch 'stop-pix' -and ($_.CommandLine -match 'pi-web\\.js|models-sync\\.mjs|matrix-server\\.mjs' -or $_.CommandLine -match 'next start') } | ForEach-Object { $_.ProcessId }"`,
@@ -37,7 +37,7 @@ try {
 } catch {}
 
 if (pidSet.size === 0) {
-  console.log("✓ 未检测到运行中的 PiX 服务，端口 30141 处于空闲就绪状态。");
+  console.log("✓ 未检测到运行中的 PiX 服务，端口 30141 / 30142 处于空闲就绪状态。");
   process.exit(0);
 }
 
@@ -48,18 +48,18 @@ for (const pid of pidSet) {
   } catch {}
 }
 
-// 再次确认端口是否释放
+// 再次确认两个服务端口是否释放
 let stillInUse = false;
 try {
   const check = execSync(
-		`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141,30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`,
+    `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 30141,30142 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LocalPort -Unique"`,
     { encoding: "utf8" }
   );
-  if (/\d+/.test(check)) stillInUse = true;
+  if (/30141|30142/.test(check)) stillInUse = true;
 } catch {}
 
 if (stillInUse) {
-  console.log("⚠ 端口 30141 仍被占用，可能需要管理员权限结束占用进程。");
+  console.log("⚠ 端口 30141 或 30142 仍被占用，可能需要检查相应 PiX 服务进程。");
 } else {
-  console.log("✓ 所有 PiX 进程已安全终止，端口 30141 释放完毕。");
+  console.log("✓ 所有 PiX 进程已安全终止，端口 30141 / 30142 释放完毕。");
 }

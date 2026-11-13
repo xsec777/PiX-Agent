@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.8.0（2026-11-13）— 原生桌面客户端集成 30142 攻击面实时看板
+
+- Electron 桌面客户端启动时在检查 30142 端口后按需拉起 `matrix-server.mjs`，避免重复启动；
+- 系统托盘增加攻击面实时进度看板入口，并显示 Web/Matrix 服务状态；
+- 退出流程仅终止由桌面客户端启动的子进程，避免宽泛按端口清理误伤其他 PiX 实例；
+- `PiX-Web.cmd` 在 Web 服务已运行时检查并补启矩阵服务；停止脚本确认 30141/30142 均释放；
+- 版本号、lockfile、README 徽标与 CHANGELOG 同步升级至 `2.8.0`。
+
 ## 2.7.1（2026-11-12）— 零依赖 30142 SSE 实时只读资产监控大屏
 
 - 新增 `scripts/matrix-server.mjs`，使用 Node.js 原生 http/fs/path 提供本地 SSE 实时大屏与 `/api/matrix` 只读快照接口；
