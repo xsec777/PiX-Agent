@@ -1,7 +1,7 @@
 {
   "name": "pix-extension",
-  "version": "2.8.1",
-  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：pix-doctor 运行环境与网络驱动健康巡检工具 + Live Matrix",
+  "version": "2.9.0",
+  "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：接口状态机、实时矩阵与离线机制验收",
   "type": "module",
   "main": "index.ts",
   "private": true,

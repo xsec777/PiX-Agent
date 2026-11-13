@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.0（2026-11-13）— 接口状态机端到端离线验收与 CI
+
+- 新增 `acceptance/matrix.test.ts`，覆盖端点状态流转、多源输出水合、实时快照、终端看板、大产物归档、结案门禁、差分复验与命令防护八组离线验收；
+- 新增 GitHub Actions 工作流，在 Node.js 22 下执行类型检查、机制验收与已有回归测试；
+- 使用失败即抛错的断言，测试产物隔离到临时目录，避免断言失败被 CI 误报为成功；
+- 保留已有脱敏路径、单目标凭据分析与桌面进程清理修复；同步版本号、lockfile 与 README 徽标至 `2.9.0`。
+
 ## 2.8.1（2026-11-13）— pix-doctor 运行环境与网络驱动健康巡检
 
 - 新增 `scripts/pix-doctor.mjs`，检查 Node.js、Python、Git、Npcap/WinPcap 状态；
