@@ -1,0 +1,44 @@
+name: PiX CI & Mechanism Verification
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck & End-to-End Mechanism Acceptance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm --prefix extension ci --ignore-scripts --no-fund --no-audit
+
+      - name: Typecheck extension
+        run: node extension/node_modules/typescript/bin/tsc -p extension/tsconfig.json
+
+      - name: Run End-to-End Mechanism Acceptance
+        run: node --experimental-strip-types acceptance/matrix.test.ts
+
+      - name: Run Existing Regression Tests
+        run: |
+          TEST_ROOT=$(mktemp -d)
+          cd "$TEST_ROOT"
+          node --experimental-strip-types "$GITHUB_WORKSPACE/acceptance/cred-vault-scope.test.ts"
+          cd "$GITHUB_WORKSPACE"
+          node --experimental-strip-types acceptance/tactical-loader-v2.7.test.ts
+
+      - name: Verify Environment Doctor
+        run: node scripts/pix-doctor.mjs
