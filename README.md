@@ -6,7 +6,7 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v2.9.0](https://img.shields.io/badge/PiX-v2.9.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![验收](https://img.shields.io/badge/验收-31%2F31-22c55e?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v2.9.1](https://img.shields.io/badge/PiX-v2.9.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
@@ -14,6 +14,10 @@
 
 ## ✨ 特性一览
 
+- 📊 **实时矩阵看板 (Port 30142)**：通过只读 SSE 展示端点七态、闭环指标与请求/响应证据详情
+- 🔒 **结案与证伪检查**：未闭环端点提示与 L4 证伪检查；结案拦截依赖宿主提供 `agent_before_settle` 事件
+- 🪨 **大产物归档**：超过阈值的工具输出落盘至 `.pix/artifacts/`，通过 `get_artifact` 按行读取
+- 🔬 **差分复验**：支持时间、报错与布尔差分规则，辅助复核候选漏洞，结果仍需结合现场证据判断
 - 🧠 **机制化渗透纪律**：事实画板、失败强制回读、元认知反思、节奏自适应——不是提示词恳求，是事件钩子硬机制
 - 🧰 **自带工具箱**：31 个实测渗透工具 + 7 张扩展位卡，`toolbox` 网关按需发现（list / howto / search）
 - 🛡️ **双重护栏**：读卡门禁（未读卡禁调工具）+ 本机危险命令拦截 + 600s 超时注入
@@ -47,26 +51,17 @@
 
 ---
 
-## 🚀 启动与关闭（成熟智能体专属控制台）
+## 🚀 启动与关闭
 
-为提供工业级易用性，项目根目录预置了完整的管理启动与关闭脚本：
+仓库提供以下 Windows 命令脚本：
 
-| 启动器脚本 | 核心作用 | 使用说明 |
-|---|---|---|
-| **`启动器.cmd`** (或 `launcher.cmd`) | **全功能交互式控制台** | 双击打开交互菜单，实时显示服务运行状态（端口 30141 占用与 PID），支持 [1] 启动 Web [2] 终端模式 [3] 状态巡检 [4] 停止关闭 [5] 武器自检 |
-| **`pix-web.cmd`** | **一键极速启动 Web** | 双击直接同步扩展、启动 pi-web 并自动在浏览器打开 `http://127.0.0.1:30141`；控制台窗口明确提供关闭方式提示 |
-| **`pix-stop.cmd`** | **一键彻底关闭与清理** | 双击即可一键安全终止所有后台监听进程与守护程序，**强制释放端口 30141**，杜绝孤儿进程残留 |
-| **`pix.cmd`** | **终端交互直接对话** | 双击进入控制台全屏/终端直接对话模式 (pi CLI) |
+| 脚本 | 用途 |
+|---|---|
+| `PiX-Web.cmd` | 同步扩展并启动 Pi Web 服务和实时矩阵服务 |
+| `PiX-Stop.cmd` | 停止 PiX 启动的服务进程 |
+| `PiX.cmd` | 在当前工作区启动 Pi CLI |
 
-### 快速启动与关闭姿势：
-
-1. **方式 1：双击 `启动器.cmd`（推荐）**
-   - 查看当前服务是否处于运行状态；
-   - 输入 `1` 回车启动 Web 工作台并自动打开浏览器；
-   - 需要关闭时，在菜单中输入 `4` 即可一键安全关闭所有服务。
-2. **方式 2：双击 `pix-web.cmd` 启动，双击 `pix-stop.cmd` 关闭**
-   - 随时双击 `pix-web.cmd` 开工；
-   - 测试结束或需要释放端口时，随时双击 `pix-stop.cmd` 彻底收工。
+也可从仓库根目录使用 Node.js 运行 `scripts/pix-doctor.mjs` 检查环境。
 
 ## 🔑 配置模型（必须）
 
@@ -177,8 +172,9 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 | `/mode pent \| redt` · `/mode adaptive on\|off` | 切换模式 / 节奏自适应开关 |
 | `/auth <目标...> --source <来源>` | 登记授权范围（注入围栏） |
 | `/task <任务书.md>` | 登记红队任务书 |
+| `/matrix` · `/ledger` | 终端闭环进度看板，`/matrix <ep_id>` 查看单端点证据详情 |
 | `/pix` · `/pix export` | 状态总览 / 画板双 Mermaid 落盘 |
-| `/facts` · `/facts json` | 导出不可篡改的 Ground Truth 纯事实底表（Markdown / 机器高保真 JSON，含资产、跳板、凭据、台账、漏洞原始请求包） |
+| `/facts` · `/facts json` · `/facts csv` | 导出事实底表（Markdown / JSON / 标准 targets.csv） |
 | `/toolbox export` | 全量工具卡手册导出 |
 
 | 工具 | 用途 |
@@ -186,8 +182,12 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 | `record_host` | 登记内网主机资产（IP、系统、所属域、DC、PWNED控制状态、开放端口），智能增量合并服务 |
 | `record_pivot` | 登记内网跳板与隧道（Socks5/FRP/SSH/TUN），建立内网网段透明路由映射 |
 | `record_cred` | 登记已收割凭据（明文/NTLM/Kerberos/SSH），管理权限等级与已打通的内网主机 |
-| `record_endpoint` | 登记 Web/API 接口资产台账（URL、方法、参数、来源），建立 100% 闭环测试追踪 |
-| `update_endpoint` | 流转接口状态机（probing 探针 -> bypassing 绕过 -> confirmed 坐实 / rejected 排除） |
+| `record_endpoint` | 将 Web/API 接口记录到端点台账（URL、方法、参数、来源），供后续测试与状态跟踪 |
+| `update_endpoint` | 更新端点测试状态并记录动作和差分证据；状态更新不代表真实探测完成或漏洞结论已证实 |
+| `analyze_credential_target` | 对调用者显式指定的单个主机与凭据进行本地范围和服务兼容性分析，不验证凭据、不生成认证命令、不发起连接 |
+| `verify_finding` | 按指定的差分规则评估候选漏洞；结果需结合现场证据复核 |
+| `mutate_payload` | 为授权测试生成候选 payload 变异，须遵守授权范围与安全限制 |
+| `get_artifact` | 按行读取已归档的大型工具输出 |
 | `consult_tactics` | 即时动态检索内网横向、AD 域攻坚、隧道穿透与攻击面测绘顶级战术 SOP |
 | `pivot_exec` | 目标处于内网时自动生成并注入原生代理参数或 proxychains 代理链路由命令 |
 | `record_fact` / `record_capability` / `record_failure` | 画板记节点 + 连边 / 能力 / 失败计数（≥6 触发回读） |
@@ -199,15 +199,20 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 
 ## 🧪 验收
 
-离线验收（真实 pi RPC + stub 模型回放，不打目标）：
+CI 执行八组离线机制验收、凭据范围与战术路由回归测试，以及 TypeScript 严格检查。机制验收使用本地夹具，不连接外部目标，也不替代宿主事件与实际工具的集成验证：
 
 ```bash
-cd acceptance && npm install && node run-acceptance.mjs
-# 或一键（检查→部署→验收）
-node scripts/ci-acceptance.mjs
+node --experimental-strip-types acceptance/matrix.test.ts
+node scripts/pix-doctor.mjs
 ```
 
-31 项断言：模式注入（pent/redt/授权/任务书）、失败 6 次回读、元认知反思、节奏墙钟实测（连败 2s/连胜 0.5s/基准 2s）、护栏拦截、读卡门禁拦/放、会话重载读回、toolbox 三入口、update_node 联动、画板/报告落盘、历史画板继承。全程绿色即通过。
+`acceptance/run-acceptance.mjs` 保留旧版 RPC + stub 模型验收流程，依赖本机 Pi 安装与扩展部署；它不在本版本 CI 验证范围内。
+
+## 📚 架构文档
+
+- [接口状态机与闭环机制白皮书](docs/matrix-architecture.md)：现有机制、验证范围与限制。
+- [领域术语与目标架构](CONTEXT.md)：包含尚未实现的设计术语。
+- [架构决策记录](docs/adr/README.md)：12 份设计决策及各自的实现状态。
 
 ## 🔧 故障排查
 

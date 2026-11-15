@@ -53,7 +53,7 @@ export function flushLiveMatrix(source = "manual"): LiveMatrixSnapshot | null {
 		const currentFocus = pendingQueue.length > 0 ? pendingQueue[0] : null;
 
 		const snapshot: LiveMatrixSnapshot = {
-			version: "2.0.3",
+			version: "2.1.0",
 			updatedAt: new Date().toISOString(),
 			lastSource: source,
 			metrics,
@@ -70,7 +70,7 @@ export function flushLiveMatrix(source = "manual"): LiveMatrixSnapshot | null {
 		try {
 			const fallbackFile = join(process.cwd(), "pix-live-matrix.json");
 			const snapshot: LiveMatrixSnapshot = {
-				version: "2.0.3",
+				version: "2.1.0",
 				updatedAt: new Date().toISOString(),
 				lastSource: source,
 				metrics: getMatrixMetrics(),
