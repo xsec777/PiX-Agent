@@ -1,5 +1,5 @@
 /**
- * matrix.test.ts — 端点状态机、自动水合、石碑存储与防偷懒门禁全量机制端到端离线断言套件
+ * matrix.test.ts — 端点状态机、自动水合、石碑存储与结案门禁的离线机制验收
  */
 
 import assert from "node:assert/strict";
@@ -85,7 +85,7 @@ console.log("  → 通过 ✓");
 // ---------------------------------------------------------------------------
 console.log("[断言 3/8] 实时总线快照原子双写与指标聚合...");
 const snap = flushLiveMatrix("test_harness");
-assert.ok(snap !== null && snap.version === "2.0.3", "快照数据结构应合法");
+assert.ok(snap !== null && snap.version === "2.1.0", "快照数据结构应合法");
 assert.ok(snap.metrics.totalEndpoints >= 2, "指标统计总端点数应准确");
 const diskSnap = readLiveMatrixSnapshot();
 assert.ok(diskSnap !== null && diskSnap.updatedAt === snap.updatedAt, "磁盘快照读取应一致");
