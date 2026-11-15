@@ -6,7 +6,7 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v2.9.1](https://img.shields.io/badge/PiX-v2.9.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.0.0](https://img.shields.io/badge/PiX-v3.0.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
@@ -24,6 +24,7 @@
 - 📊 **画板知识继承**：状态跨会话持久化，下次开工自动继承上次画板（不重复侦察）
 - 🧾 **事实底表导出**：`/facts` 或 `/facts json` 一键导出不可篡改的 Ground Truth 纯事实底表（支持机器高保真 JSON 与表格化 Markdown），解耦排版，可无缝灌入任意自定义报告模板
 - 🔬 **客观传感器**：多维阻断模式识别（WAF/限流/人机/域认证），连续拦截自动触发止损并反向推荐实战 SOP
+- 🐝 **Swarm 契约预览**：TaskEnvelope、WorkerPool、WatchdogCeiling、四态终结与 WorkerResult 对账原语；当前仅离线验证，不创建真实子会话、不自动执行工具。
 
 ---
 
@@ -199,14 +200,14 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 
 ## 🧪 验收
 
-CI 执行八组离线机制验收、凭据范围与战术路由回归测试，以及 TypeScript 严格检查。机制验收使用本地夹具，不连接外部目标，也不替代宿主事件与实际工具的集成验证：
+CI 执行基础机制验收、六组 Swarm 契约离线测试、凭据范围与战术路由回归测试，以及 TypeScript 严格检查。Swarm 测试只验证内存契约和账本对账，不创建 Pi 子会话、不连接外部目标，也不替代真实宿主集成验证：
 
 ```bash
 node --experimental-strip-types acceptance/matrix.test.ts
 node scripts/pix-doctor.mjs
 ```
 
-`acceptance/run-acceptance.mjs` 保留旧版 RPC + stub 模型验收流程，依赖本机 Pi 安装与扩展部署；它不在本版本 CI 验证范围内。
+`acceptance/run-acceptance.mjs` 保留旧版 RPC + stub 模型验收流程，依赖本机 Pi 安装与扩展部署；它不在本版本 CI 验证范围内。Swarm 原语尚未接入 `index.ts` 的用户工具，也没有真实 Worker 执行器、取消回收或自动看门狗调度。
 
 ## 📚 架构文档
 
