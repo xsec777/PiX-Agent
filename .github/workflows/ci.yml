@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Typecheck & End-to-End Mechanism Acceptance
+    name: Typecheck & Offline Acceptance
     runs-on: ubuntu-latest
 
     steps:
@@ -23,22 +23,30 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Install extension dependencies
         run: npm --prefix extension ci --ignore-scripts --no-fund --no-audit
 
       - name: Typecheck extension
         run: node extension/node_modules/typescript/bin/tsc -p extension/tsconfig.json
 
-      - name: Run End-to-End Mechanism Acceptance
+      - name: Run mechanism acceptance
         run: node --experimental-strip-types acceptance/matrix.test.ts
 
-      - name: Run Existing Regression Tests
+      - name: Run Swarm primitive contract tests
+        run: |
+          set -e
+          for test in task-envelope termination watchdog worker-pool worker-result swarm; do
+            node --experimental-strip-types "acceptance/$test.test.ts"
+          done
+
+      - name: Run credential-scope regression
         run: |
           TEST_ROOT=$(mktemp -d)
           cd "$TEST_ROOT"
           node --experimental-strip-types "$GITHUB_WORKSPACE/acceptance/cred-vault-scope.test.ts"
-          cd "$GITHUB_WORKSPACE"
-          node --experimental-strip-types acceptance/tactical-loader-v2.7.test.ts
+
+      - name: Run tactical-loader regression
+        run: node --experimental-strip-types acceptance/tactical-loader-v2.7.test.ts
 
       - name: Verify Environment Doctor
         run: node scripts/pix-doctor.mjs

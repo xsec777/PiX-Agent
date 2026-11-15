@@ -833,6 +833,11 @@ export function recordEndpoint(params: {
 		return state.endpoints;
 	}
 
+	export function getEndpointById(idOrUrl: string): EndpointNode | undefined {
+		state.endpoints ??= [];
+		return state.endpoints.find((ep) => ep.id === idOrUrl || ep.url === idOrUrl);
+	}
+
 	export function getUnresolvedEndpoints(limit = 8): EndpointNode[] {
 		state.endpoints ??= [];
 		return state.endpoints
