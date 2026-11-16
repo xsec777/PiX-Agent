@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.0-alpha.2（2026-11-16）— 不可变任务信封与序列化契约
+
+- 新增 TaskEnvelope、ProbeQuota、SecurityBoundary 数据契约及深度冻结、双向序列化；
+- 采用已发布预览版的只读缺省、目标 Host/禁入路径和配额校验；此处仅校验数据，不执行网络探测；
+- CI 增加严格离线 TaskEnvelope 测试，保留 WorkerPool 与已有回归验证；此历史分支不合并 master、不替代 v3.0.0 预览版。
+
 ## 3.0.0-alpha.1（2026-11-16）— WorkerPool 槽位管理原语
 
 - 保存早期 Swarm WorkerPool 设计的槽位状态、并发窗口和执行遥测原语；

@@ -1,7 +1,6 @@
-feat(swarm): 引入 WorkerPool 内存槽位管理原语 (v3.0.0-alpha.1)
+feat(swarm): 引入不可变 TaskEnvelope 与序列化契约 (v3.0.0-alpha.2)
 
-- 保存 WorkerPool 槽位、并发窗口和执行遥测的早期里程碑。
-- 保留重复 Worker ID 拦截及任务绑定不可由遥测改写的限制。
-- 使用严格离线断言，alpha 分支 CI 执行类型检查、WorkerPool、现有机制与回归测试。
-- 基于 v2.9.1 脱敏发布基线；此历史 alpha 不合并回 master，也不替代 v3.0.0 契约预览。
-- 本版本没有 Pi SDK 子会话执行器或自主工具执行能力。
+- 在 alpha.1 历史发布基线上增加 TaskEnvelope、ProbeQuota 和 SecurityBoundary 数据契约。
+- 保留已发布契约预览中的默认只读、Host 一致性/白名单、禁入路径和配额上限校验；新增深度冻结与双向序列化。
+- 新增严格离线 TaskEnvelope 测试并接入 alpha 分支 CI，失败断言返回非零退出码。
+- 基于 v2.9.1 脱敏发布基线；本 alpha 分支不合并 master，不替代 v3.0.0 契约预览，也不创建真实子会话或执行工具。
