@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.0-beta.1（2026-11-17）— 四态终结契约与离线回执
+
+- 在 alpha.2 历史发布基线上增加 confirmed、escalating、bypassing、rejected 四态提交参数校验与回执生成；
+- 新增严格离线终结契约测试并接入 beta.1 分支 CI，保留此前安全修复和回归验证；
+- 此模块不注册真实 worker_submit 工具，不自动结束会话、升档模型或回写台账；历史长度检查也不验证真实发包或测试维度覆盖。
+
 ## 3.0.0-alpha.2（2026-11-16）— 不可变任务信封与序列化契约
 
 - 新增 TaskEnvelope、ProbeQuota、SecurityBoundary 数据契约及深度冻结、双向序列化；

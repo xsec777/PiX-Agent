@@ -2,7 +2,7 @@ name: PiX CI & Mechanism Verification
 
 on:
   push:
-    branches: [ master, main, feat/v3.0.0-alpha.2 ]
+    branches: [ master, main, feat/v3.0.0-beta.1 ]
   pull_request:
     branches: [ master, main ]
 
@@ -37,6 +37,9 @@ jobs:
 
       - name: Run TaskEnvelope alpha contract tests
         run: node --experimental-strip-types acceptance/task-envelope.test.ts
+
+      - name: Run Termination beta contract tests
+        run: node --experimental-strip-types acceptance/termination.test.ts
 
       - name: Run Existing Regression Tests
         run: |

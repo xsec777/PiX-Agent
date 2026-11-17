@@ -1,6 +1,6 @@
-feat(swarm): 引入不可变 TaskEnvelope 与序列化契约 (v3.0.0-alpha.2)
+feat(worker): 增加四态终结契约校验与回执原语 (v3.0.0-beta.1)
 
-- 在 alpha.1 历史发布基线上增加 TaskEnvelope、ProbeQuota 和 SecurityBoundary 数据契约。
-- 保留已发布契约预览中的默认只读、Host 一致性/白名单、禁入路径和配额上限校验；新增深度冻结与双向序列化。
-- 新增严格离线 TaskEnvelope 测试并接入 alpha 分支 CI，失败断言返回非零退出码。
-- 基于 v2.9.1 脱敏发布基线；本 alpha 分支不合并 master，不替代 v3.0.0 契约预览，也不创建真实子会话或执行工具。
+- 在 alpha.2 历史发布基线上增加四态终结提交参数校验与建议回执生成。
+- confirmed 检查标题/请求/响应字段，escalating 检查立足点或资产，bypassing 检查阻断说明和尝试数，rejected 检查历史条数与摘要。
+- 严格离线终结测试接入 beta.1 分支 CI，保留 TaskEnvelope、WorkerPool 与基础回归验证。
+- 不注册宿主工具、不终止真实会话、不执行网络请求、不自动升档或回写台账；历史分支不合并 master，也不替代 v3.0.0 契约预览。
