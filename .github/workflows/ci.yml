@@ -2,7 +2,7 @@ name: PiX CI & Mechanism Verification
 
 on:
   push:
-    branches: [ master, main, feat/v3.0.0-beta.2 ]
+    branches: [ master, main, feat/v3.0.0-rc.1 ]
   pull_request:
     branches: [ master, main ]
 
@@ -43,6 +43,9 @@ jobs:
 
       - name: Run Watchdog beta contract tests
         run: node --experimental-strip-types acceptance/watchdog.test.ts
+
+      - name: Run WorkerResult rc contract tests
+        run: node --experimental-strip-types acceptance/worker-result.test.ts
 
       - name: Run Existing Regression Tests
         run: |

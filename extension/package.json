@@ -1,6 +1,6 @@
 {
   "name": "pix-extension",
-  "version": "3.0.0-beta.2",
+  "version": "3.0.0-rc.1",
   "description": "PiX — 假设驱动、自带渗透工具箱的 Pi Agent 发行版（扩展层）：接口状态机、实时矩阵与离线机制验收",
   "type": "module",
   "main": "index.ts",

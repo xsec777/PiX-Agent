@@ -1,6 +1,6 @@
-feat(worker): 增加 WatchdogCeiling 超限状态记录器 (v3.0.0-beta.2)
+feat(swarm): 增加 WorkerResult 本地结果对账契约 (v3.0.0-rc.1)
 
-- 在 beta.1 四态终结预览基线上增加 Worker 轮次和墙钟超限状态记录器与离线测试。
-- 超限仅在 check/recordTurn 调用时计算；重复活动 workerId 注册被拒绝；模块不设定时器、不终止会话或子进程、不接入执行循环。
-- 接入 beta.2 CI，保留 TaskEnvelope、WorkerPool、Termination、基础机制及既有回归验证。
-- 作为独立历史 beta 分支发布，不合并 master、不设 Latest；不宣称具有自动熔断或自主 Worker 能力。
+- 在 beta.2 历史发布基线上增加 WorkerResult 数据契约与本地状态对账。
+- 保留任务绑定、证据字段和进程内重放保护，拒绝不存在/已闭环端点及错配结果。
+- 增加严格离线对账测试并纳入 rc.1 CI，保留已有原语及安全回归。
+- 本模块不创建或终止真实 Worker，不提供跨文件事务或重启后重放保护；独立历史分支不合并 master、不设 Latest。
