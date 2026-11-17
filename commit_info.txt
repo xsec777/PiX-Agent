@@ -1,6 +1,6 @@
-feat(worker): 增加四态终结契约校验与回执原语 (v3.0.0-beta.1)
+feat(worker): 增加 WatchdogCeiling 超限状态记录器 (v3.0.0-beta.2)
 
-- 在 alpha.2 历史发布基线上增加四态终结提交参数校验与建议回执生成。
-- confirmed 检查标题/请求/响应字段，escalating 检查立足点或资产，bypassing 检查阻断说明和尝试数，rejected 检查历史条数与摘要。
-- 严格离线终结测试接入 beta.1 分支 CI，保留 TaskEnvelope、WorkerPool 与基础回归验证。
-- 不注册宿主工具、不终止真实会话、不执行网络请求、不自动升档或回写台账；历史分支不合并 master，也不替代 v3.0.0 契约预览。
+- 在 beta.1 四态终结预览基线上增加 Worker 轮次和墙钟超限状态记录器与离线测试。
+- 超限仅在 check/recordTurn 调用时计算；重复活动 workerId 注册被拒绝；模块不设定时器、不终止会话或子进程、不接入执行循环。
+- 接入 beta.2 CI，保留 TaskEnvelope、WorkerPool、Termination、基础机制及既有回归验证。
+- 作为独立历史 beta 分支发布，不合并 master、不设 Latest；不宣称具有自动熔断或自主 Worker 能力。

@@ -6,7 +6,7 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.0.0-beta.1](https://img.shields.io/badge/PiX-v3.0.0--beta.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.0.0-beta.2](https://img.shields.io/badge/PiX-v3.0.0--beta.2-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
@@ -14,7 +14,7 @@
 
 ## ✨ 特性一览
 
-本分支保存 `v3.0.0-beta.1` 的早期四态终结契约、TaskEnvelope 与 WorkerPool 里程碑，基于 `v2.9.1` 发布基线。提供四态提交参数校验与建议回执、冻结任务信封、序列化、内存槽位、并发窗口和遥测状态管理，不创建 Pi SDK 子会话、不执行工具；它早于已发布的 `v3.0.0` 契约预览，不作为主分支升级。`handleWorkerSubmit` 只生成回执，不注册宿主工具、不强制结束会话、不自动切换模型或更新台账；探测历史条数和字段不代表真实发包或漏洞已证实。
+本分支保存 `v3.0.0-beta.2` 的四态终结与看门狗阈值记录、TaskEnvelope 与 WorkerPool 历史里程碑，基于 `v2.9.1` 发布基线。提供四态提交参数校验与建议回执、显式调用时的轮次/时钟超限状态记录、冻结任务信封、序列化、内存槽位和遥测管理，不创建 Pi SDK 子会话、不执行工具；它早于已发布的 `v3.0.0` 契约预览，不作为主分支升级。`handleWorkerSubmit` 只生成回执，WatchdogCeiling 不运行定时器、不终止会话或子进程、不自动切换模型或更新台账。它们不是真实执行层熔断，提交的探测历史也不证明真实发包或漏洞已证实。
 
 - 📊 **实时矩阵看板 (Port 30142)**：通过只读 SSE 展示端点七态、闭环指标与请求/响应证据详情
 - 🔒 **结案与证伪检查**：未闭环端点提示与 L4 证伪检查；结案拦截依赖宿主提供 `agent_before_settle` 事件

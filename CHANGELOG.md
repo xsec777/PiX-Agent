@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.0-beta.2（2026-11-17）— Worker 看门狗超限状态记录器
+
+- 增加 Worker 轮次和墙钟时间上限的离线状态计算，并记录触发状态；
+- 增加 WatchdogCeiling 单元断言与 beta.2 分支 CI 检查；
+- 此状态记录器不运行定时器、不取消会话或子进程、不接入真实 Worker 执行循环；超限结论仅在调用 `check` 或 `recordTurn` 时计算。
+
 ## 3.0.0-beta.1（2026-11-17）— 四态终结契约与离线回执
 
 - 在 alpha.2 历史发布基线上增加 confirmed、escalating、bypassing、rejected 四态提交参数校验与回执生成；
