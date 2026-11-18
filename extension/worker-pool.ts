@@ -1,12 +1,14 @@
 /**
- * worker-pool.ts — 基于 Pi SDK 内存级 In-Process Sub-Session 的 WorkerPool 调度引擎 (ADR 0001/0002/0004)
+ * worker-pool.ts — WorkerPool 内存槽位与 Host 字符串锁管理 (ADR 0001/0002/0004)
  *
  * 核心职责：
- * 1. 物理隔离：管理主控 Planner 与 Worker 子会话之间的并发槽位与内存生命周期；
+ * 1. 槽位管理：记录 Worker ID 与任务绑定，不创建 Pi SDK 子会话；
  * 2. 槽位调度：动态分配与维护有限并发窗口 (ConcurrencyWindow, 默认 2~3)；
  * 3. 槽位遥测：实时跟踪每个 Worker 槽位的执行时长、当前动作、轮次硬顶及状态机跃迁；
  * 4. 动态扩缩：支持自适应流控 (AdaptiveThrottle) 动态伸缩并发窗口大小。
  */
+
+import { globalHostMutex } from "./concurrency.ts";
 
 export type WorkerSlotStatus = "idle" | "running" | "completed" | "failed" | "terminated";
 
@@ -113,12 +115,14 @@ export class WorkerPool {
 			const slotId = `slot-${i}`;
 			const slot = this.slots.get(slotId);
 			if (slot && slot.status === "idle") {
+				const host = params.targetHost === undefined ? null : globalHostMutex.normalizeHost(params.targetHost);
+				if (host !== null && (!host || globalHostMutex.isLocked(host) || !globalHostMutex.acquire(host, params.workerId))) return null;
 				const now = Date.now();
 				slot.workerId = params.workerId;
 				slot.status = "running";
 				slot.endpointId = params.endpointId;
 				slot.taskEnvelopeId = params.taskEnvelopeId ?? null;
-				slot.targetHost = params.targetHost ?? null;
+				slot.targetHost = host;
 				slot.modelTier = params.modelTier ?? "FastTier";
 				slot.startTime = now;
 				slot.elapsedMs = 0;
@@ -144,7 +148,7 @@ export class WorkerPool {
 				if (patch.status !== undefined) slot.status = patch.status;
 				if (patch.currentAction !== undefined) slot.currentAction = patch.currentAction;
 				if (patch.turnCount !== undefined) slot.turnCount = patch.turnCount;
-					if (patch.modelTier !== undefined) slot.modelTier = patch.modelTier;
+				if (patch.modelTier !== undefined) slot.modelTier = patch.modelTier;
 
 				if (slot.startTime) {
 					slot.elapsedMs = Date.now() - slot.startTime;
@@ -161,6 +165,7 @@ export class WorkerPool {
 	public releaseSlot(workerId: string, finalStatus: "completed" | "failed" | "terminated" = "completed"): boolean {
 		for (const slot of this.slots.values()) {
 			if (slot.workerId === workerId) {
+				if (slot.targetHost) globalHostMutex.release(slot.targetHost, workerId);
 				if (finalStatus === "completed") {
 					this.completedCount++;
 				} else {
@@ -249,6 +254,9 @@ export class WorkerPool {
 	 * 彻底重置池状态（清理会话、单测用）
 	 */
 	public reset(): void {
+		for (const slot of this.slots.values()) {
+			if (slot.workerId && slot.targetHost) globalHostMutex.release(slot.targetHost, slot.workerId);
+		}
 		this.completedCount = 0;
 		this.failedCount = 0;
 		this.totalDispatched = 0;

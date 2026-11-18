@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.0.0](https://img.shields.io/badge/PiX-v3.0.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.1.0](https://img.shields.io/badge/PiX-v3.1.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+`v3.1.0` 延续 Swarm 契约预览。HostMutex 在同一进程内对 trim/lowercase 后的 Host 字符串加锁，WorkerPool 在申请、释放及重置时维护其持有的锁。未提供 Host 时不加锁；不同别名、端口或进程不会自动合并，亦不拦截实际网络发包，不能据此保证避免过载或限流。真实 Worker 子会话执行器仍未实现。
 
 - 📊 **实时矩阵看板 (Port 30142)**：通过只读 SSE 展示端点七态、闭环指标与请求/响应证据详情
 - 🔒 **结案与证伪检查**：未闭环端点提示与 L4 证伪检查；结案拦截依赖宿主提供 `agent_before_settle` 事件
@@ -200,7 +202,7 @@ toolbox({action:"howto", tool:"sqlmap"})        # 完整工具卡：唯一姿势
 
 ## 🧪 验收
 
-CI 执行基础机制验收、六组 Swarm 契约离线测试、凭据范围与战术路由回归测试，以及 TypeScript 严格检查。Swarm 测试只验证内存契约和账本对账，不创建 Pi 子会话、不连接外部目标，也不替代真实宿主集成验证：
+CI 执行基础机制验收、七组 Swarm 契约离线测试、凭据范围与战术路由回归测试，以及 TypeScript 严格检查。Swarm 测试只验证内存契约和账本对账，不创建 Pi 子会话、不连接外部目标，也不替代真实宿主集成验证：
 
 ```bash
 node --experimental-strip-types acceptance/matrix.test.ts
