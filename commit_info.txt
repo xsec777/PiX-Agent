@@ -1,7 +1,6 @@
-feat(swarm): 发布 PiX v3.0.0 Swarm 契约预览与离线验证 (v3.0.0)
+feat(pacing): 增加 HostMutex 与 WorkerPool 锁生命周期 (v3.1.0)
 
-- 新增 TaskEnvelope、WorkerPool、WatchdogCeiling、TerminationContract 与 WorkerResult 原语。
-- 新增六组离线契约测试，覆盖冻结信封、只读边界、槽位上限、超时/轮次检查、四态收口与安全对账。
-- 对账要求活跃槽位、任务信封与端点绑定一致，拒绝已闭环端点的重复或迟到结果。
-- 保留 v2.9.1 的凭据范围限制、文档边界说明、CI 与主控扩展；Swarm 尚未接入真实 Pi 子会话执行器，不宣称自主集群 GA。
-- 扩展、桌面包与 lockfile 同步为 3.0.0；运行快照与大产物保持忽略。
+- 新增同进程 Host 字符串锁与严格离线测试。
+- WorkerPool 申请/释放维护对应锁，重置仅释放本池锁；保留重复 Worker ID 拦截和不可改写任务绑定。
+- CI 增加 HostMutex 和跨池重置测试，安装器同步新模块，发行元数据统一为 3.1.0。
+- 延续 Swarm 契约预览，不宣称真实网络发包门禁、防封禁保证或可用子会话执行器。

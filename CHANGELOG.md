@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.1.0（2026-11-18）— HostMutex 与槽位锁生命周期预览
+
+- 增加同进程 Host 字符串互斥锁，接入 WorkerPool 申请、释放及重置；
+- 保留 Worker ID 去重和任务绑定保护，池重置仅释放本池持有的锁；
+- 新增严格并发契约测试，覆盖键归一化、冲突、释放、跨池重置及空键；
+- 仍为 Swarm 原语预览，不拦截网络发包、不保证避免限流，不提供真实子会话执行器。
+
 ## 3.0.0（2026-11-15）— Swarm 契约预览与离线对账验证
 
 - 新增 TaskEnvelope、WorkerPool、WatchdogCeiling、四态 TerminationContract 和 WorkerResult 内存契约；
