@@ -10,6 +10,7 @@
 
 import { updateEndpointStatus, recordEndpoint, getEndpointById, type EndpointStatus } from "./state.ts";
 import type { ProbeRecord } from "./termination.ts";
+import { redactEvidenceRequest } from "./redaction.ts";
 import { globalWorkerPool } from "./worker-pool.ts";
 import { globalWatchdogCeiling } from "./watchdog.ts";
 
@@ -182,7 +183,7 @@ export function reconcileWorkerResult(result: WorkerResult): ReconciliationRepor
 			action: result.action,
 			diffSignature: result.evidenceResponse ? result.evidenceResponse.slice(0, 120) : undefined,
 			vuln: result.vulnerabilityTitle,
-			evidenceRequest: result.evidenceRequest,
+			evidenceRequest: result.evidenceRequest ? redactEvidenceRequest(result.evidenceRequest) : undefined,
 			evidenceResponse: result.evidenceResponse,
 		});
 
