@@ -11,6 +11,7 @@
 import { updateEndpointStatus, recordEndpoint, getEndpointById, type EndpointStatus } from "./state.ts";
 import type { ProbeRecord } from "./termination.ts";
 import { redactEvidenceRequest } from "./redaction.ts";
+import { runResponseHygieneGate } from "./pii-masker.ts";
 import { globalWorkerPool } from "./worker-pool.ts";
 import { globalWatchdogCeiling } from "./watchdog.ts";
 
@@ -177,15 +178,16 @@ export function reconcileWorkerResult(result: WorkerResult): ReconciliationRepor
 	}
 
 	const originalStatus = existing.status;
+	const evidenceResponse = result.evidenceResponse ? runResponseHygieneGate(result.evidenceResponse).sanitized : undefined;
 
 	// 1. 回写端点状态机跃迁 (更新台账)
-		updateEndpointStatus(result.endpointId, result.status, {
-			action: result.action,
-			diffSignature: result.evidenceResponse ? result.evidenceResponse.slice(0, 120) : undefined,
-			vuln: result.vulnerabilityTitle,
-			evidenceRequest: result.evidenceRequest ? redactEvidenceRequest(result.evidenceRequest) : undefined,
-			evidenceResponse: result.evidenceResponse,
-		});
+	updateEndpointStatus(result.endpointId, result.status, {
+		action: result.action,
+		diffSignature: evidenceResponse?.slice(0, 120),
+		vuln: result.vulnerabilityTitle,
+		evidenceRequest: result.evidenceRequest ? redactEvidenceRequest(result.evidenceRequest) : undefined,
+		evidenceResponse,
+	});
 
 	// 2. 级联水合回传的新资产 (URL 端点)
 	let newAssetsAdded = 0;
