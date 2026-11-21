@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.3.1](https://img.shields.io/badge/PiX-v3.3.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.4.0](https://img.shields.io/badge/PiX-v3.4.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+新增 ADSafetyGate 本地保护模块：调用方显式提供域锁定策略并报告尝试次数，模块按规范化的域与账号限制后续记账调用。未知策略或阈值不大于 2 时默认拒绝记账。它不探测域控、不读取真实账号、不执行认证、不监听其他工具，也不协调多进程；计数重置或进程退出会丢失状态。该本地上限不能保证不锁号，是否允许任何认证仍须由书面授权、现场策略和停止条件共同决定。
 
 新增响应证据规则掩码：WorkerResult 本地对账在保存 `evidenceResponse`、差分摘要和历史片段前，处理匹配格式的手机号、身份证号、邮箱与 `Set-Cookie`；对顶层 JSON 数组、指定顶层列表字段和超过 8 行的非 JSON 文本最多保留 3 项或 3 行。计数仅来自输入，不是数据库总量。输出是供阅读的证据摘要，不是可复放报文；其他写入入口、历史数据和未匹配的敏感信息仍需人工核验。
 
