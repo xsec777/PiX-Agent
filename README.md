@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.4.0](https://img.shields.io/badge/PiX-v3.4.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.4.1](https://img.shields.io/badge/PiX-v3.4.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+本机隧道命令防护：在 `bash` 和 `powershell` 工具入口中拦截命中规则的隧道命令，不弹出通用危险命令确认。规则基于命令文本，不等同于网络隔离或操作系统级管控；本版不支持通过任务书放行，也不自动清理现有隧道。
 
 新增 ADSafetyGate 本地保护模块：调用方显式提供域锁定策略并报告尝试次数，模块按规范化的域与账号限制后续记账调用。未知策略或阈值不大于 2 时默认拒绝记账。它不探测域控、不读取真实账号、不执行认证、不监听其他工具，也不协调多进程；计数重置或进程退出会丢失状态。该本地上限不能保证不锁号，是否允许任何认证仍须由书面授权、现场策略和停止条件共同决定。
 

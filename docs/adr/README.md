@@ -13,7 +13,7 @@
 | [0007 事实迁移](0007-in-context-fact-learning-over-pattern-engine.md) | 部分实现 |
 | [0008 完全匹配去重](0008-exact-match-endpoint-deduplication.md) | 核心去重已实现，完整资产保全部分实现 |
 | [0009 账号防锁定门禁](0009-account-lockout-policy-probing-and-safety-buffer.md) | 本地策略及计数已实现；无真实策略探测和发包拦截 |
-| [0010 授权隧道与清账](0010-taskbook-authorized-ephemeral-tunneling-and-cleanup.md) | 未实现 |
+| [0010 授权隧道与清账](0010-taskbook-authorized-ephemeral-tunneling-and-cleanup.md) | 部分实现：shell 命令特征拦截；无任务书放行或清理 |
 | [0011 混合报告流水线](0011-hybrid-reporting-pipeline-and-ground-truth-isolation.md) | 部分实现 |
 | [0012 只读遥测看板](0012-unidirectional-passive-telemetry-dashboard.md) | 只读 HTTP 通道已实现 |
 

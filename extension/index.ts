@@ -60,6 +60,7 @@ import {
 import { currentDelayMs, failureRate, sleep } from "./pacing.ts";
 import { buildSection } from "./rules.ts";
 import { detectDangerous } from "./guard.ts";
+import { detectTunnelCommand } from "./tunnel-gate.ts";
 import { checkCardGate, ensureTimeout } from "./gate.ts";
 import { countExternalAction, noteLedger, noteResult, resetSensors } from "./sensor.ts";
 import { mirrorPentrackCall, resetMirror } from "./mirror.ts";
@@ -277,7 +278,7 @@ export default function (pi: ExtensionAPI) {
 
 	// -----------------------------------------------------------------------
 	// tool_call：有序检查链（ARTEX 合并语义：首个 block 生效即停，改参最后获胜）
-	//   ①guard 本机危险命令拦截 → ②读卡门禁 → ③bash/powershell 默认超时注入
+	//   隧道命令前置拦截 → ①本机危险命令 → ②读卡门禁 → ③默认超时注入
 	//   全部拦截话术带「平台管控·非目标防御」前缀，防 agent 把拦截当目标 WAF 去绕
 	// -----------------------------------------------------------------------
 	pi.on("tool_call", async (event, ctx) => {
@@ -285,6 +286,11 @@ export default function (pi: ExtensionAPI) {
 		if (!isShell) return;
 		const cmd = String((event.input as { command?: unknown } | undefined)?.command ?? "");
 		if (!cmd) return;
+
+		const tunnelTool = detectTunnelCommand(cmd);
+		if (tunnelTool) {
+			return { block: true, reason: `【PiX 平台管控·非目标防御】已拦截隧道命令（${tunnelTool}）。` };
+		}
 
 		// ① 本机危险命令（环境防护）
 		const hit = detectDangerous(event.toolName, cmd);
