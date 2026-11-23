@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.4.1](https://img.shields.io/badge/PiX-v3.4.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.4.2](https://img.shields.io/badge/PiX-v3.4.2-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+新增显式本地清理注册表：创建实例时指定清理目录，登记普通临时文件或调用方创建的 `ChildProcess` 句柄，显式调用并等待 `executeAllCleanup()`。清理按登记逆序执行，文件在删除前核对路径与身份，进程等待退出确认；失败记为 failed，未实现的端口转发撤销记为 skipped。注册、待清理列表和审计记录返回副本。仅适用于可信调用方管理的本地临时目录；不提供远程清理、任意 PID 终止、子进程树清理或自动退出钩子，也不保证并发文件替换防护或零残留。
 
 本机隧道命令防护：在 `bash` 和 `powershell` 工具入口中拦截命中规则的隧道命令，不弹出通用危险命令确认。规则基于命令文本，不等同于网络隔离或操作系统级管控；本版不支持通过任务书放行，也不自动清理现有隧道。
 
