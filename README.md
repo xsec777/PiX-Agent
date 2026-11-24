@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.5.0](https://img.shields.io/badge/PiX-v3.5.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.5.1](https://img.shields.io/badge/PiX-v3.5.1-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+新增本地执行摘要草稿：显式调用 `generateExecutiveSummary` 只读取报告计数，按固定规则生成受众标签、台账限制、优先事项和治理路线图；支持组织名、自定义关注项和固定时间。组织名及关注项应用有限脱敏和 Markdown 转义，结果不修改输入报告。整体风险保持 UNASSESSED，不据计数自动推断漏洞等级或把空台账视为安全；没有 LLM、网络、文件写入或自动报告合并，仍须人工审核。
 
 新增本地报告组装模块：显式调用 `assembleDataPlaneReport` 读取输入端点台账，按相同范围计算状态统计，输出规则处理后的请求/响应证据与 SHA-256 内容摘要。缺失证据明确标注，测试计数原样保留，严重级别不自动推断。模块不修改输入、不调用模型、不写文件，也未接入现有导出命令；状态和标题不等于独立确证，不同标题可能共享端点当前证据。摘要不是签名，脱敏规则覆盖有限，发布前仍需核验事实、证据归属和敏感信息。
 
