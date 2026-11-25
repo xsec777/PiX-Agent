@@ -15,6 +15,6 @@
 | [0009 账号防锁定门禁](0009-account-lockout-policy-probing-and-safety-buffer.md) | 本地策略及计数已实现；无真实策略探测和发包拦截 |
 | [0010 授权隧道与清账](0010-taskbook-authorized-ephemeral-tunneling-and-cleanup.md) | 部分实现：shell 命令拦截及显式本地清理；无任务书放行或远程清理 |
 | [0011 混合报告流水线](0011-hybrid-reporting-pipeline-and-ground-truth-isolation.md) | 本地报告模板与内容摘要；无 LLM 管理摘要或导出接线 |
-| [0012 只读遥测看板](0012-unidirectional-passive-telemetry-dashboard.md) | 只读 HTTP 通道已实现 |
+| [0012 只读遥测看板](0012-unidirectional-passive-telemetry-dashboard.md) | 只读 HTTP 通道及 Swarm 快照展示已实现；无实时池绑定 |
 
 参见[机制白皮书](../matrix-architecture.md)与[领域术语](../../CONTEXT.md)。
