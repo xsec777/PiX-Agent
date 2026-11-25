@@ -21,12 +21,33 @@ const MATRIX_FILE = path.join(CWD, "pix-live-matrix.json");
 
 const sseClients = new Set();
 
-/** 读取当前实时矩阵数据 (带容错兜底) */
-function getMatrixData() {
+const emptySwarm = () => ({
+	maxConcurrency: 2,
+	activeSlots: 0,
+	totalSlots: 4,
+	slots: Array.from({ length: 4 }, (_, i) => ({
+		id: `slot-${i + 1}`,
+		status: "idle",
+		workerId: null,
+		targetHost: null,
+		modelTier: "FastTier",
+		turnCount: 0,
+		elapsedMs: 0,
+		currentAction: "等待派发任务",
+	})),
+	hostLocks: [],
+	throttle: { state: "normal", currentWindow: 2, inCooldown: false },
+});
+
+/** Read the local snapshot; absent Swarm fields receive an idle display placeholder. */
+export function getMatrixData() {
 	if (fs.existsSync(MATRIX_FILE)) {
 		try {
-			return JSON.parse(fs.readFileSync(MATRIX_FILE, "utf8"));
-		} catch {}
+			const parsed = JSON.parse(fs.readFileSync(MATRIX_FILE, "utf8"));
+			return { ...parsed, swarm: parsed.swarm ?? emptySwarm() };
+		} catch {
+			// Ignore malformed or unreadable snapshots and return an idle view.
+		}
 	}
 	return {
 		version: "2.0.16",
@@ -47,6 +68,7 @@ function getMatrixData() {
 		currentFocus: null,
 		hosts: [],
 		endpoints: [],
+		swarm: emptySwarm(),
 	};
 }
 
@@ -62,19 +84,23 @@ function broadcastSSE(data) {
 	}
 }
 
-// 监听 pix-live-matrix.json 文件变更
-let watchDebounce = null;
-if (fs.existsSync(CWD)) {
+/** Start a watcher only for an explicitly started server; returns a cleanup function. */
+export function watchMatrixFile() {
+	let watchDebounce = null;
+	let watcher = null;
 	try {
-		fs.watch(CWD, (_eventType, filename) => {
-			if (filename === "pix-live-matrix.json") {
-				if (watchDebounce) clearTimeout(watchDebounce);
-				watchDebounce = setTimeout(() => {
-					broadcastSSE(getMatrixData());
-				}, 150);
-			}
+		watcher = fs.watch(CWD, (_eventType, filename) => {
+			if (filename !== "pix-live-matrix.json") return;
+			if (watchDebounce) clearTimeout(watchDebounce);
+			watchDebounce = setTimeout(() => broadcastSSE(getMatrixData()), 150);
 		});
-	} catch {}
+	} catch {
+		// Filesystem watching is optional; REST reads still return the current snapshot.
+	}
+	return () => {
+		if (watchDebounce) clearTimeout(watchDebounce);
+		watcher?.close();
+	};
 }
 
 const HTML_PAGE = `<!DOCTYPE html>
@@ -227,6 +253,8 @@ const HTML_PAGE = `<!DOCTYPE html>
       <div>坐实漏洞: <b id="stat-vuln" style="color: var(--red);">0</b> 处</div>
       <div>变异绕过中: <b id="stat-bypassing" style="color: var(--purple);">0</b> 处</div>
       <div>焦点攻坚: <b id="stat-focus" style="color: #60a5fa;">空闲</b></div>
+      <div>并发窗口: <b id="stat-concurrency" style="color: #60a5fa;">2</b></div>
+      <div>活跃 Worker: <b id="stat-active-workers" style="color: var(--yellow);">0/4</b></div>
     </div>
     <div class="progress-wrap">
       <div class="seg" id="b-confirmed" style="background: var(--red); width: 0%;"></div>
@@ -241,6 +269,10 @@ const HTML_PAGE = `<!DOCTYPE html>
     <div class="card-panel">
       <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;">目标站点资产</div>
       <div id="hosts-container" style="display:flex; flex-direction:column; gap:8px;"></div>
+      <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-top:8px;">Swarm 调度槽位（快照）</div>
+      <div id="slots-container" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-top:8px;">HostMutex 站点锁（快照）</div>
+      <div id="locks-container" style="display:flex; flex-direction:column; gap:6px;"></div>
     </div>
 
     <div class="card-panel">
@@ -284,11 +316,37 @@ const HTML_PAGE = `<!DOCTYPE html>
     let currentData = null;
     let selectedId = null;
 
+    function textNode(value) { return document.createTextNode(String(value ?? '')); }
+    function renderRows(containerId, items, formatter, emptyText) {
+      const box = document.getElementById(containerId);
+      box.replaceChildren();
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.style.color = 'var(--muted)';
+        empty.style.fontSize = '11px';
+        empty.textContent = emptyText;
+        box.append(empty);
+        return;
+      }
+      for (const item of items) {
+        const row = document.createElement('div');
+        row.className = 'slot-card';
+        row.style.cssText = 'background:#080c14;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:11px';
+        row.append(textNode(formatter(item)));
+        box.append(row);
+      }
+    }
+
     function render(data) {
       if (!data) return;
       currentData = data;
       const m = data.metrics || {};
+      const swarm = data.swarm || {};
       const total = m.totalEndpoints || 0;
+      document.getElementById('stat-concurrency').textContent = swarm.maxConcurrency ?? 2;
+      document.getElementById('stat-active-workers').textContent = (swarm.activeSlots ?? 0) + '/' + (swarm.totalSlots ?? 4);
+      renderRows('slots-container', swarm.slots || [], s => s.id + ' | ' + s.status + ' | Worker: ' + (s.workerId || '空闲') + ' | ' + (s.currentAction || ''), '暂无槽位快照');
+      renderRows('locks-container', swarm.hostLocks || [], l => l.host + ' → ' + l.workerId, '无活动站点锁定');
 
       document.getElementById('stat-hosts').innerText = (data.hosts || []).length;
       document.getElementById('stat-total').innerText = total;
@@ -307,29 +365,30 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
 
       // 渲染 Hosts
-      const hBox = document.getElementById('hosts-container');
-      hBox.innerHTML = (data.hosts || []).map(h => \`
-        <div style="background:#0b0f19; border:1px solid var(--border); border-radius:6px; padding:8px 10px;">
-          <div style="font-weight:600; font-size:12px; display:flex; justify-content:space-between;">
-            <span>\${h.hostname || h.ips[0]}</span>
-            <span style="font-size:10px; color:\${h.isCompromised ? 'var(--red)' : 'var(--muted)'};">\${h.isCompromised ? 'PWNED' : h.networkScope || 'EXT'}</span>
-          </div>
-          <div style="font-size:11px; color:var(--muted); margin-top:2px;">\${h.ips.join('/')} | 服务: \${(h.services || []).length}个</div>
-        </div>
-      \`).join('') || '<div style="font-size:11px; color:var(--muted);">暂无存活主机资产</div>';
+      renderRows('hosts-container', data.hosts || [], h => [h.hostname || h.ips?.[0] || '未知主机', h.isCompromised ? 'PWNED' : h.networkScope || 'EXT', (h.ips || []).join('/')].join(' | '), '暂无存活主机资产');
 
-      // 渲染 Endpoints
+      // Render endpoint rows with DOM text nodes rather than HTML interpolation.
       const tbody = document.getElementById('ep-tbody');
-      tbody.innerHTML = (data.endpoints || []).map(e => \`
-        <tr onclick="selectEp('\${e.id}')">
-          <td><span class="method \${e.method.toLowerCase()}">\${e.method}</span></td>
-          <td style="font-weight:500;">\${e.url}</td>
-          <td style="color:var(--muted); font-size:11px;">\${(e.params || []).join(', ') || '-'}</td>
-          <td style="text-align:center;">\${e.testedTimes || 0}</td>
-          <td><span class="badge \${e.status}">\${e.status}</span></td>
-          <td style="color:\${e.status === 'confirmed' ? 'var(--red)' : 'inherit'};">\${(e.vulnerabilities || []).join('、') || '-'}</td>
-        </tr>
-      \`).join('') || '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--muted);">暂无接口台账记录</td></tr>';
+      tbody.replaceChildren();
+      for (const e of data.endpoints || []) {
+        const row = document.createElement('tr');
+        row.addEventListener('click', () => selectEp(e.id));
+        for (const value of [e.method, e.url, (e.params || []).join(', ') || '-', e.testedTimes || 0, e.status, (e.vulnerabilities || []).join('、') || '-']) {
+          const cell = document.createElement('td');
+          cell.append(textNode(value));
+          row.append(cell);
+        }
+        tbody.append(row);
+      }
+      if (!(data.endpoints || []).length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 6;
+        cell.textContent = '暂无接口台账记录';
+        cell.style.cssText = 'text-align:center;padding:20px;color:var(--muted)';
+        row.append(cell);
+        tbody.append(row);
+      }
 
       document.getElementById('table-summary').innerText = \`共 \${total} 端点\`;
       if (selectedId) selectEp(selectedId);
@@ -364,7 +423,9 @@ const HTML_PAGE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const server = http.createServer((req, res) => {
+/** Passive read-only HTTP server. Caller chooses a local bind address; import alone opens nothing. */
+export function createMatrixServer() {
+	return http.createServer((req, res) => {
 	const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
 
 	// Passive telemetry only: reject all methods that could be interpreted as writes.
@@ -407,6 +468,13 @@ const server = http.createServer((req, res) => {
 	res.end(HTML_PAGE);
 });
 
-server.listen(PORT, HOST, () => {
-	console.log(`[PiX Matrix Server] 实时监控大屏已启动: http://${HOST}:${PORT}`);
-});
+}
+
+if (process.argv[1] && /matrix-server\.mjs$/i.test(process.argv[1].replace(/\\/g, '/'))) {
+	const server = createMatrixServer();
+	const stopWatcher = watchMatrixFile();
+	server.on('close', stopWatcher);
+	server.listen(PORT, HOST, () => {
+		console.log(`[PiX Matrix Server] 只读遥测大屏已启动: http://${HOST}:${PORT}`);
+	});
+}
