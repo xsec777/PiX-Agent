@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.5.2](https://img.shields.io/badge/PiX-v3.5.2-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.6.0](https://img.shields.io/badge/PiX-v3.6.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+新增 [V3 架构与实现边界说明](docs/v3-architecture-whitepaper.md)，汇总本地契约模块、目标架构和已知差距；新增严格离线 V3 契约冒烟测试，覆盖任务信封、槽位、流控、模型档位、看门狗、终结契约、脱敏、AD 本地记账、报告与结果对账。本文与测试不构成自主红队 GA 或真实 Worker 运行时证明。
 
 新增只读遥测大屏的 Swarm 快照展示：服务端允许被显式导入和本地测试，默认仍绑定 127.0.0.1，并仅接受 GET/HEAD/OPTIONS。若本地快照未携带 `swarm` 字段，展示层提供四个空闲槽位与默认流控占位；页面使用 DOM 文本节点渲染，不把快照内容拼进 HTML。槽位数据来自快照，不是实时 WorkerPool 绑定；服务没有应用层鉴权，CORS 不是访问控制，证据输出仍须脱敏。
 
