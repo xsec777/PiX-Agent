@@ -35,7 +35,7 @@ jobs:
       - name: Run Swarm primitive contract tests
         run: |
           set -e
-          for test in task-envelope termination watchdog worker-pool worker-result swarm concurrency throttler model-tiering escalation redaction pii-masker ad-safety tunnel-gate cleanup-watchdog report-engine executive-summary matrix-server v3-swarm; do
+          for test in task-envelope termination watchdog worker-pool worker-result swarm concurrency throttler model-tiering escalation redaction pii-masker ad-safety tunnel-gate cleanup-watchdog report-engine executive-summary matrix-server v3-swarm subagent-ui; do
             node --experimental-strip-types "acceptance/$test.test.ts"
           done
 

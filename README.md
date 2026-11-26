@@ -6,13 +6,15 @@
 
 基于 [@earendil-works/pi-coding-agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 扩展机制二次开发 · 不改上游一行代码 · 一切皆插件
 
-![PiX v3.6.0](https://img.shields.io/badge/PiX-v3.6.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+![PiX v3.7.0](https://img.shields.io/badge/PiX-v3.7.0-10b981?style=flat-square) ![pi 1.1.0](https://img.shields.io/badge/pi-1.1.0-2563eb?style=flat-square) ![pi-web 0.11.0](https://img.shields.io/badge/pi--web-0.11.0-2496ED?style=flat-square) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white) ![机制验收](https://img.shields.io/badge/机制验收-8组-22c55e?style=flat-square) ![Live Matrix](https://img.shields.io/badge/Live%20Matrix-30142-8b5cf6?style=flat-square) ![工具卡](https://img.shields.io/badge/工具-38%E5%BC%A0%E5%8D%A1-22c55e?style=flat-square) ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 </div>
 
 ---
 
 ## ✨ 特性一览
+
+新增本地子 Agent 模型偏好模块：显式设置 FastTier 的 provider/modelId 或恢复跟随主模型，返回只读快照，校验输入但不读取用户模型配置、不写文件、不调用模型服务。配套严格离线测试验证偏好切换、显式本地路由配置、计数重置与初始空会话。源版本目录中的 pi-web 组件片段缺少完整上游工程上下文，仅作为可选集成参考，不纳入本仓库构建，也不宣称已构建 Web UI 或自动切换真实模型。
 
 新增 [V3 架构与实现边界说明](docs/v3-architecture-whitepaper.md)，汇总本地契约模块、目标架构和已知差距；新增严格离线 V3 契约冒烟测试，覆盖任务信封、槽位、流控、模型档位、看门狗、终结契约、脱敏、AD 本地记账、报告与结果对账。本文与测试不构成自主红队 GA 或真实 Worker 运行时证明。
 
